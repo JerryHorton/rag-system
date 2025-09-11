@@ -1,0 +1,141 @@
+# 企业级RAG系统配置文件
+# 包含服务器、数据库、缓存、AI模型以及各种组件的配置
+
+spring:
+  datasource:
+    url: jdbc:postgresql://localhost:15432/rag_system
+    username: postgres
+    password: postgres
+    driver-class-name: org.postgresql.Driver
+    hikari:
+      maximum-pool-size: 10
+      minimum-idle: 5
+      idle-timeout: 30000
+      connection-timeout: 30000
+      pool-name: RagHikariPool
+  
+  # Spring AI配置
+  ai:
+    openai:
+      api-key: ${OPENAI_API_KEY:sk-375014f0a89f4e3ebb9cc22ef791cd90}
+      base-url: ${OPENAI_BASE_URL:https://dashscope.aliyuncs.com/compatible-mode}
+      chat:
+        options:
+          model: qwen-plus-2025-07-14
+          temperature: 0.7
+          top-p: 1.0
+          max-tokens: 2000
+      embedding:
+        options:
+          model: text-embedding-v4
+          dimensions: 1536
+  servlet:
+    multipart:
+      max-file-size: 10MB
+
+mybatis:
+  mapper-locations: classpath:/mybatis/mapper/*.xml
+  config-location: classpath:/mybatis/config/mybatis-config.xml
+  type-handlers-package: cn.cug.sxy.ai.infrastructure.dao.mybatis.typehandler
+
+# PageHelper分页插件配置
+pagehelper:
+  helper-dialect: postgresql
+  reasonable: true
+  support-methods-arguments: true
+  params: count=countSql
+
+# 服务器配置
+server:
+  port: 8091
+  tomcat:
+    threads:
+      max: 500        # 设定处理客户请求的线程的最大数目，决定了服务器可以同时响应客户请求的数,默认200
+      min-spare: 50   # 初始化线程数,最小空闲线程数,默认是10
+    accept-count: 10  # 等待队列长度
+
+# 日志
+logging:
+  level:
+    root: info
+  config: classpath:logback-spring.xml
+
+
+
+# RAG系统自定义配置
+rag:
+  async:
+    document:
+      core-pool-size: 4
+      max-pool-size: 16
+      queue-capacity: 200
+      keep-alive-seconds: 60
+    vector:
+      core-pool-size: 8
+      max-pool-size: 32
+      queue-capacity: 500
+      keep-alive-seconds: 120
+  # 文档分块配置
+  chunking:
+    default-chunk-size: 1000
+    default-chunk-overlap: 200
+    token-estimator: tiktoken
+  
+  # 检索配置
+  retrieval:
+    default-limit: 5
+    default-min-score: 0.7
+    reranker-enabled: true
+    default-index: default_index
+  
+  # 路由配置
+  routing:
+    default-query-type: BASIC
+    use-semantic-router: true
+    semantic:
+      threshold: 0.75
+      min-difference: 0.1
+  
+  # 查询转换配置
+  query-transformation:
+    multi-query-enabled: true
+    hyde-enabled: true
+    step-back-enabled: true
+  
+  # 多查询配置
+  multi-query:
+    variants: 5
+    max-variants: 10
+
+  # 生成配置
+  generation:
+    default-model: gpt-3.5-turbo
+    self-correction-enabled: true
+    max-tokens: 1024
+    temperature: 0.7
+  
+  # 指标和评估配置
+  metrics:
+    evaluation-enabled: true
+    log-metrics: true
+    prometheus-enabled: true
+    required-relevance-score: 7.0
+    required-faithfulness-score: 8.0
+  
+  # 向量存储配置
+  vector-store:
+    # PGVector配置
+    pgvector:
+      table-name: t_document_chunk
+      vector-column: vector
+      content-column: content
+      metadata-column: metadata
+      index-method: ivfflat
+      index-lists: 100
+
+    # Milvus配置
+    milvus:
+      host: localhost
+      port: 19530
+      collection: rag_collection
+      dimension: 1536 

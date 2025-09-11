@@ -1,0 +1,208 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="cn.cug.sxy.ai.infrastructure.dao.IDocumentChunkDao">
+
+    <!-- 结果映射 -->
+    <resultMap id="BaseResultMap" type="cn.cug.sxy.ai.infrastructure.dao.po.DocumentChunkPO">
+        <id column="id" property="id"/>
+        <result column="document_id" property="documentId"/>
+        <result column="content" property="content"/>
+        <result column="start_position" property="startPosition"/>
+        <result column="end_position" property="endPosition"/>
+        <result column="chunk_index" property="chunkIndex"/>
+        <result column="metadata" property="metadata"/>
+        <result column="create_time" property="createTime"/>
+        <result column="update_time" property="updateTime"/>
+        <result column="vectorized" property="vectorized"/>
+        <result column="vector_id" property="vectorId"/>
+        <result column="overlap_length" property="overlapLength" jdbcType="INTEGER"/>
+        <result column="quality_score" property="qualityScore" jdbcType="DOUBLE"/>
+    </resultMap>
+
+    <!-- 所有列 -->
+    <sql id="Base_Column_List">
+        id, document_id, content, start_position, end_position, chunk_index,
+        metadata, create_time, update_time, vectorized, vector_id,
+        overlap_length, quality_score
+    </sql>
+
+    <!-- 插入新文档片段 -->
+    <insert id="insert" parameterType="cn.cug.sxy.ai.infrastructure.dao.po.DocumentChunkPO" useGeneratedKeys="true"
+            keyProperty="id">
+        INSERT INTO t_document_chunk (document_id, content, start_position, end_position, chunk_index,
+                                      metadata, create_time, update_time, vectorized, vector_id,
+                                      overlap_length, quality_score)
+        VALUES (#{documentId},
+                #{content},
+                #{startPosition},
+                #{endPosition},
+                #{chunkIndex},
+                #{metadata}::jsonb,
+                #{createTime},
+                #{updateTime},
+                #{vectorized},
+                #{externalVectorId},
+                #{overlapLength},
+                #{qualityScore})
+    </insert>
+
+    <!-- 批量插入多个文档片段 -->
+    <insert id="batchInsert" parameterType="java.util.List" useGeneratedKeys="true" keyProperty="id">
+        INSERT INTO t_document_chunk (
+        document_id, content, start_position, end_position, chunk_index,
+        metadata, create_time, update_time, vectorized, vector_id,
+        overlap_length, quality_score
+        )
+        VALUES
+        <foreach collection="chunkPOs" item="item" separator=",">
+            (
+            #{item.documentId},
+            #{item.content},
+            #{item.startPosition},
+            #{item.endPosition},
+            #{item.chunkIndex},
+            #{item.metadata}::jsonb,
+            #{item.createTime},
+            #{item.updateTime},
+            #{item.vectorized},
+            #{item.vectorId},
+            #{item.overlapLength},
+            #{item.qualityScore}
+            )
+        </foreach>
+    </insert>
+
+    <!-- 根据ID更新文档片段 -->
+    <update id="updateById" parameterType="cn.cug.sxy.ai.infrastructure.dao.po.DocumentChunkPO">
+        UPDATE t_document_chunk
+        <set>
+            <if test="documentId != null">document_id = #{documentId},</if>
+            <if test="content != null">content = #{content},</if>
+            <if test="startPosition != null">start_position = #{startPosition},</if>
+            <if test="endPosition != null">end_position = #{endPosition},</if>
+            <if test="chunkIndex != null">chunk_index = #{chunkIndex},</if>
+            <if test="metadata != null">metadata = #{metadata}::jsonb,</if>
+            <if test="updateTime != null">update_time = #{updateTime},</if>
+            <if test="vectorized != null">vectorized = #{vectorized},</if>
+            <if test="vectorId != null">vector_id = #{vectorId},</if>
+            <if test="overlapLength != null">overlap_length = #{overlapLength},</if>
+            <if test="qualityScore != null">quality_score = #{qualityScore},</if>
+        </set>
+        WHERE id = #{id}
+    </update>
+
+    <!-- 根据ID删除文档片段 -->
+    <delete id="deleteById" parameterType="java.lang.Long">
+        DELETE
+        FROM t_document_chunk
+        WHERE id = #{id}
+    </delete>
+
+    <!-- 根据文档ID删除所有相关文档片段 -->
+    <delete id="deleteByDocumentId" parameterType="java.lang.Long">
+        DELETE
+        FROM t_document_chunk
+        WHERE document_id = #{documentId}
+    </delete>
+
+    <!-- 根据ID查询文档片段 -->
+    <select id="selectById" parameterType="java.lang.Long" resultMap="BaseResultMap">
+        SELECT
+        <include refid="Base_Column_List"/>
+        FROM t_document_chunk
+        WHERE id = #{id}
+    </select>
+
+    <!-- 根据文档ID查询所有相关文档片段 -->
+    <select id="selectByDocumentId" parameterType="java.lang.Long" resultMap="BaseResultMap">
+        SELECT
+        <include refid="Base_Column_List"/>
+        FROM t_document_chunk
+        WHERE document_id = #{documentId}
+    </select>
+
+    <!-- 根据文档ID查询所有相关文档片段，按照位置排序 -->
+    <select id="selectByDocumentIdOrdered" parameterType="java.lang.Long" resultMap="BaseResultMap">
+        SELECT
+        <include refid="Base_Column_List"/>
+        FROM t_document_chunk
+        WHERE document_id = #{documentId}
+        ORDER BY chunk_index ASC
+    </select>
+
+    <!-- 根据条件查询文档片段列表 -->
+    <select id="selectByCondition" parameterType="java.util.Map" resultMap="BaseResultMap">
+        SELECT
+        <include refid="Base_Column_List"/>
+        FROM t_document_chunk
+        <where>
+            <if test="documentId != null">
+                AND document_id = #{documentId}
+            </if>
+            <if test="chunkIndex != null">
+                AND chunk_index = #{chunkIndex}
+            </if>
+            <if test="vectorized != null">
+                AND vectorized = #{vectorized}
+            </if>
+            <if test="vectorId != null">
+                AND vector_id = #{vectorId}
+            </if>
+            <if test="minQualityScore != null">
+                AND quality_score >= #{minQualityScore}
+            </if>
+            <if test="maxQualityScore != null">
+                AND quality_score &lt;= #{maxQualityScore}
+            </if>
+        </where>
+    </select>
+
+    <!-- 查询未向量化的文档片段列表 -->
+    <select id="selectNonVectorizedChunks" resultMap="BaseResultMap">
+        SELECT
+        <include refid="Base_Column_List"/>
+        FROM t_document_chunk
+        WHERE vectorized = FALSE
+        ORDER BY create_time ASC
+        LIMIT #{limit}
+    </select>
+
+    <select id="selectAll" resultMap="BaseResultMap">
+        SELECT
+        <include refid="Base_Column_List"/>
+        FROM t_document_chunk
+    </select>
+
+    <!-- 更新文档片段向量化状态 -->
+    <update id="updateVectorized">
+        UPDATE t_document_chunk
+        SET vectorized  = #{vectorized},
+            vector_id   = #{vectorId},
+            update_time = NOW()
+        WHERE id = #{id}
+    </update>
+
+    <select id="selectByVectorId" resultMap="BaseResultMap" parameterType="java.lang.String">
+        SELECT
+        <include refid="Base_Column_List"/>
+        FROM t_document_chunk
+        WHERE vector_id = #{vectorId}
+    </select>
+
+    <select id="searchByKeyword" resultMap="BaseResultMap" parameterType="java.lang.String">
+        SELECT
+        <include refid="Base_Column_List"/>
+        FROM t_document_chunk
+        WHERE content LIKE CONCAT('%', #{keyword}, '%')
+        ORDER BY quality_score DESC
+    </select>
+
+    <!-- 统计某文档未向量化片段数量 -->
+    <select id="countNonVectorizedByDocumentId" parameterType="java.lang.Long" resultType="int">
+        SELECT COUNT(1)
+        FROM t_document_chunk
+        WHERE document_id = #{documentId}
+          AND vectorized = FALSE
+    </select>
+
+</mapper>

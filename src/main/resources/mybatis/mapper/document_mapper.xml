@@ -1,0 +1,244 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="cn.cug.sxy.ai.infrastructure.dao.IDocumentDao">
+
+    <!-- 结果映射 -->
+    <resultMap id="BaseResultMap" type="cn.cug.sxy.ai.infrastructure.dao.po.DocumentPO">
+        <id column="id" property="id"/>
+        <result column="title" property="title"/>
+        <result column="content" property="content"/>
+        <result column="source" property="source"/>
+        <result column="document_type" property="documentType"/>
+        <result column="status" property="status"/>
+        <result column="batch_id" property="batchId"/>
+        <result column="parent_id" property="parentId"/>
+        <result column="create_time" property="createTime"/>
+        <result column="update_time" property="updateTime"/>
+        <result column="metadata" property="metadata" />
+        <result column="position" property="position"/>
+        <result column="vectorized" property="vectorized"/>
+        <result column="error_message" property="errorMessage"/>
+    </resultMap>
+
+    <!-- 所有列 -->
+    <sql id="Base_Column_List">
+        id, title, content, source, document_type, status, batch_id, parent_id,
+        create_time, update_time, metadata, position, vectorized, error_message
+    </sql>
+
+    <!-- 插入新文档 -->
+    <insert id="insert" parameterType="cn.cug.sxy.ai.infrastructure.dao.po.DocumentPO" useGeneratedKeys="true" keyProperty="id">
+        INSERT INTO t_document (
+            title, content, source, document_type, status, batch_id, parent_id,
+            create_time, update_time, metadata, position, vectorized, error_message
+        )
+        VALUES (
+                   #{title},
+                   #{content},
+                   #{source},
+                   #{documentType},
+                   #{status},
+                   #{batchId},
+                   #{parentId},
+                   #{createTime},
+                   #{updateTime},
+                   #{metadata}::jsonb,
+                   #{position},
+                   #{vectorized},
+                   #{errorMessage}
+               )
+    </insert>
+
+    <!-- 批量插入多个文档 -->
+    <insert id="batchInsert" parameterType="java.util.List" useGeneratedKeys="true" keyProperty="id">
+        INSERT INTO t_document (
+        title, content, source, document_type, status, batch_id, parent_id,
+        create_time, update_time, metadata, position, vectorized, error_message
+        )
+        VALUES
+        <foreach collection="documentPOs" item="item" separator=",">
+            (
+            #{item.title},
+            #{item.content},
+            #{item.source},
+            #{item.documentType},
+            #{item.status},
+            #{item.batchId},
+            #{item.parentId},
+            #{item.createTime},
+            #{item.updateTime},
+            #{item.metadata}::jsonb,
+            #{item.position},
+            #{item.vectorized},
+            #{item.errorMessage}
+            )
+        </foreach>
+    </insert>
+
+    <!-- 根据ID更新文档 -->
+    <update id="updateById" parameterType="cn.cug.sxy.ai.infrastructure.dao.po.DocumentPO">
+        UPDATE t_document
+        <set>
+            <if test="title != null">title = #{title},</if>
+            <if test="content != null">content = #{content},</if>
+            <if test="source != null">source = #{source},</if>
+            <if test="documentType != null">document_type = #{documentType},</if>
+            <if test="status != null">status = #{status},</if>
+            <if test="batchId != null">batch_id = #{batchId},</if>
+            <if test="parentId != null">parent_id = #{parentId},</if>
+            <if test="updateTime != null">update_time = #{updateTime},</if>
+            <if test="metadata != null">metadata = #{metadata},</if>
+            <if test="position != null">position = #{position},</if>
+            <if test="vectorized != null">vectorized = #{vectorized},</if>
+            <if test="errorMessage != null">error_message = #{errorMessage},</if>
+        </set>
+        WHERE id = #{id}
+    </update>
+
+    <!-- 根据ID删除文档 -->
+    <delete id="deleteById" parameterType="java.lang.Long">
+        DELETE FROM t_document WHERE id = #{id}
+    </delete>
+
+    <!-- 根据ID查询文档 -->
+    <select id="selectById" parameterType="java.lang.Long" resultMap="BaseResultMap">
+        SELECT <include refid="Base_Column_List" />
+        FROM t_document
+        WHERE id = #{id}
+    </select>
+
+    <!-- 根据条件查询文档列表 -->
+    <select id="selectByCondition" parameterType="java.util.Map" resultMap="BaseResultMap">
+        SELECT <include refid="Base_Column_List" />
+        FROM t_document
+        <where>
+            <if test="title != null">
+                AND title LIKE CONCAT('%', #{title}, '%')
+            </if>
+            <if test="source != null">
+                AND source = #{source}
+            </if>
+            <if test="documentType != null">
+                AND document_type = #{documentType}
+            </if>
+            <if test="status != null">
+                AND status = #{status}
+            </if>
+            <if test="batchId != null">
+                AND batch_id = #{batchId}
+            </if>
+            <if test="parentId != null">
+                AND parent_id = #{parentId}
+            </if>
+            <if test="vectorized != null">
+                AND vectorized = #{vectorized}
+            </if>
+            <if test="startTime != null">
+                AND create_time >= #{startTime}
+            </if>
+            <if test="endTime != null">
+                AND create_time &lt;= #{endTime}
+            </if>
+        </where>
+        ORDER BY create_time DESC
+    </select>
+
+    <!-- 根据状态查询文档列表 -->
+    <select id="selectByStatus" parameterType="java.lang.String" resultMap="BaseResultMap">
+        SELECT <include refid="Base_Column_List" />
+        FROM t_document
+        WHERE status = #{status}
+        ORDER BY create_time DESC
+    </select>
+
+    <!-- 根据批次ID查询文档列表 -->
+    <select id="selectByBatchId" parameterType="java.lang.String" resultMap="BaseResultMap">
+        SELECT <include refid="Base_Column_List" />
+        FROM t_document
+        WHERE batch_id = #{batchId}
+        ORDER BY create_time DESC
+    </select>
+
+    <!-- 根据父文档ID查询文档列表 -->
+    <select id="selectByParentId" parameterType="java.lang.Long" resultMap="BaseResultMap">
+        SELECT <include refid="Base_Column_List" />
+        FROM t_document
+        WHERE parent_id = #{parentId}
+        ORDER BY position ASC
+    </select>
+
+    <!-- 更新文档状态 -->
+    <update id="updateStatus">
+        UPDATE t_document
+        <set>
+            <if test="errorMessage != null">
+                error_message = #{errorMessage},
+            </if>
+            <if test="errorMessage == null">
+                error_message = NULL,
+            </if>
+            status = #{status},
+            update_time = NOW()
+        </set>
+        WHERE id = #{id}
+    </update>
+
+    <!-- 更新文档向量化状态 -->
+    <update id="updateVectorized">
+        UPDATE t_document
+        SET vectorized  = #{vectorized},
+            update_time = NOW()
+        WHERE id = #{id}
+    </update>
+
+    <!-- 根据文档类型查询文档列表 -->
+    <select id="selectByDocumentType" parameterType="java.lang.String" resultMap="BaseResultMap">
+        SELECT <include refid="Base_Column_List" />
+        FROM t_document
+        WHERE document_type = #{documentType}
+        ORDER BY create_time DESC
+    </select>
+
+    <select id="selectAll" resultMap="BaseResultMap">
+        SELECT
+        <include refid="Base_Column_List"/>
+        FROM t_document
+    </select>
+
+    <!-- 查询未向量化的文档列表 -->
+    <select id="selectNonVectorizedDocuments" resultMap="BaseResultMap">
+        SELECT
+        <include refid="Base_Column_List"/>
+        FROM t_document
+        WHERE vectorized = FALSE
+        AND status != 'INDEXED'
+        ORDER BY create_time ASC
+        LIMIT #{limit}
+    </select>
+
+    <!-- 统计各种状态的文档数量 -->
+    <select id="countByStatus" resultType="java.util.Map">
+        SELECT status, COUNT(id) as count
+        FROM t_document
+        GROUP BY status
+    </select>
+
+    <!-- 全文搜索文档 -->
+    <select id="searchByKeyword" parameterType="java.lang.String" resultMap="BaseResultMap">
+        SELECT <include refid="Base_Column_List" />
+        FROM t_document
+        WHERE title LIKE CONCAT('%', #{keyword}, '%')
+        OR content LIKE CONCAT('%', #{keyword}, '%')
+        ORDER BY create_time DESC
+    </select>
+
+    <!-- 根据ID列表批量查询文档 -->
+    <select id="selectByIds" resultMap="BaseResultMap">
+        SELECT <include refid="Base_Column_List" />
+        FROM t_document
+        WHERE id IN
+        <foreach collection="ids" item="id" open="(" separator="," close=")">
+            #{id}
+        </foreach>
+    </select>
+</mapper>

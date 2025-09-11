@@ -1,0 +1,1540 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>企业级RAG系统</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'PingFang SC', 'Microsoft YaHei', sans-serif;
+            padding-top: 20px;
+        }
+        .rag-container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+        .chat-container {
+            height: 500px;
+            overflow-y: auto;
+            border: 1px solid #dee2e6;
+            border-radius: 0.25rem;
+            padding: 15px;
+            margin-bottom: 15px;
+            background-color: #f8f9fa;
+        }
+        .user-message {
+            background-color: #007bff;
+            color: white;
+            border-radius: 18px 18px 0 18px;
+            padding: 10px 15px;
+            margin-bottom: 10px;
+            max-width: 70%;
+            align-self: flex-end;
+            margin-left: auto;
+        }
+        .system-message {
+            background-color: #e9ecef;
+            color: #212529;
+            border-radius: 18px 18px 18px 0;
+            padding: 10px 15px;
+            margin-bottom: 10px;
+            max-width: 70%;
+        }
+        .message-container {
+            display: flex;
+            flex-direction: column;
+            margin-bottom: 15px;
+        }
+        .message-meta {
+            font-size: 0.8em;
+            color: #6c757d;
+            margin: 5px;
+        }
+        .source-reference {
+            font-style: italic;
+            font-size: 0.85em;
+            margin-top: 5px;
+            color: #28a745;
+        }
+        .source-info {
+            cursor: pointer;
+            text-decoration: underline;
+            color: #0056b3;
+        }
+        .tab-content {
+            padding: 15px;
+            border: 1px solid #dee2e6;
+            border-top: none;
+            border-radius: 0 0 0.25rem 0.25rem;
+        }
+        .upload-area {
+            border: 2px dashed #dee2e6;
+            padding: 20px;
+            text-align: center;
+            cursor: pointer;
+            border-radius: 0.25rem;
+            margin-bottom: 15px;
+        }
+        .upload-area:hover {
+            border-color: #007bff;
+        }
+        .evaluation-metrics {
+            margin-top: 10px;
+            font-size: 0.85em;
+        }
+        .rating {
+            color: #ffc107;
+        }
+        .progress-indicator {
+            display: none;
+            text-align: center;
+            margin: 10px 0;
+        }
+        .spinner-border {
+            width: 1.5rem;
+            height: 1.5rem;
+            margin-right: 10px;
+        }
+        /* 添加调试信息样式 */
+        .debug-panel {
+            position: fixed;
+            bottom: 0;
+            right: 0;
+            width: 300px;
+            height: 200px;
+            background-color: rgba(0,0,0,0.7);
+            color: #fff;
+            padding: 10px;
+            font-family: monospace;
+            font-size: 12px;
+            overflow: auto;
+            z-index: 9999;
+            display: none;
+        }
+        
+        /* 添加文件列表样式 */
+        .selected-files {
+            margin-top: 15px;
+            max-height: 200px;
+            overflow-y: auto;
+        }
+        
+        .file-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 8px;
+            margin-bottom: 5px;
+            background-color: #f8f9fa;
+            border: 1px solid #dee2e6;
+            border-radius: 4px;
+        }
+        
+        .file-item .file-name {
+            flex-grow: 1;
+            margin-right: 10px;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+        
+        .file-item .file-size {
+            margin-right: 10px;
+            color: #6c757d;
+            font-size: 0.9em;
+        }
+        
+        .file-item .file-remove {
+            color: #dc3545;
+            cursor: pointer;
+            font-weight: bold;
+        }
+    </style>
+</head>
+<body>
+    <!-- 添加调试面板 -->
+    <div class="debug-panel" id="debugPanel"></div>
+
+    <div class="rag-container">
+        <header class="mb-4">
+            <h1 class="text-center">企业级RAG系统</h1>
+            <p class="text-center text-muted">基于Spring AI的高性能检索增强生成系统</p>
+        </header>
+        
+        <ul class="nav nav-tabs" id="myTab" role="tablist">
+            <li class="nav-item" role="presentation">
+                <button class="nav-link active" id="chat-tab" data-bs-toggle="tab" data-bs-target="#chat" type="button" role="tab" aria-controls="chat" aria-selected="true">对话</button>
+            </li>
+            <li class="nav-item" role="presentation">
+                <button class="nav-link" id="document-tab" data-bs-toggle="tab" data-bs-target="#document" type="button" role="tab" aria-controls="document" aria-selected="false">文档管理</button>
+            </li>
+            <li class="nav-item" role="presentation">
+                <button class="nav-link" id="history-tab" data-bs-toggle="tab" data-bs-target="#history" type="button" role="tab" aria-controls="history" aria-selected="false">查询历史</button>
+            </li>
+            <li class="nav-item" role="presentation">
+                <button class="nav-link" id="settings-tab" data-bs-toggle="tab" data-bs-target="#settings" type="button" role="tab" aria-controls="settings" aria-selected="false">设置</button>
+            </li>
+        </ul>
+        
+        <div class="tab-content" id="myTabContent">
+            <!-- 对话标签页 -->
+            <div class="tab-pane fade show active" id="chat" role="tabpanel" aria-labelledby="chat-tab">
+                <div class="chat-container" id="chatMessages">
+                    <div class="message-container">
+                        <div class="system-message">
+                            欢迎使用企业级RAG系统！您可以向我提问任何已索引文档中的内容。
+                        </div>
+                        <div class="message-meta">系统消息 - 今天 10:00</div>
+                    </div>
+                </div>
+                
+                <div class="progress-indicator" id="progressIndicator">
+                    <div class="spinner-border text-primary" role="status">
+                        <span class="visually-hidden">处理中...</span>
+                    </div>
+                    <span>正在思考中...</span>
+                </div>
+                
+                <div class="input-group mb-3">
+                    <input type="text" class="form-control" id="userInput" placeholder="输入您的问题...">
+                    <button class="btn btn-primary" type="button" id="sendButton">发送</button>
+                </div>
+                
+                <div class="form-check form-switch">
+                    <input class="form-check-input" type="checkbox" id="advancedRagSwitch">
+                    <label class="form-check-label" for="advancedRagSwitch">使用高级RAG（多查询融合、自我纠正等）</label>
+                </div>
+            </div>
+            
+            <!-- 文档管理标签页 -->
+            <div class="tab-pane fade" id="document" role="tabpanel" aria-labelledby="document-tab">
+                <h3 class="mb-4">文档管理</h3>
+                
+                <ul class="nav nav-pills mb-3" id="document-subtabs" role="tablist">
+                    <li class="nav-item" role="presentation">
+                        <button class="nav-link active" id="upload-tab" data-bs-toggle="pill" data-bs-target="#upload-content" type="button" role="tab" aria-controls="upload-content" aria-selected="true">上传文档</button>
+                    </li>
+                    <li class="nav-item" role="presentation">
+                        <button class="nav-link" id="url-tab" data-bs-toggle="pill" data-bs-target="#url-content" type="button" role="tab" aria-controls="url-content" aria-selected="false">URL导入</button>
+                    </li>
+                    <li class="nav-item" role="presentation">
+                        <button class="nav-link" id="text-tab" data-bs-toggle="pill" data-bs-target="#text-content" type="button" role="tab" aria-controls="text-content" aria-selected="false">文本输入</button>
+                    </li>
+                    <li class="nav-item" role="presentation">
+                        <button class="nav-link" id="manage-tab" data-bs-toggle="pill" data-bs-target="#manage-content" type="button" role="tab" aria-controls="manage-content" aria-selected="false">管理文档</button>
+                    </li>
+                </ul>
+                
+                <div class="tab-content" id="document-subtabs-content">
+                    <!-- 上传文档子标签页 -->
+                    <div class="tab-pane fade show active" id="upload-content" role="tabpanel" aria-labelledby="upload-tab">
+                        <div class="upload-area" id="dropZone">
+                            <p>拖拽文件到这里上传，或点击选择文件</p>
+                            <input type="file" id="fileInput" class="d-none" multiple>
+                        </div>
+                        
+                        <!-- 添加已选文件列表 -->
+                        <div class="selected-files d-none" id="selectedFiles">
+                            <h6 class="mb-2">已选择的文件：</h6>
+                            <div id="fileList">
+                                <!-- 文件列表将通过JavaScript动态添加 -->
+                            </div>
+                        </div>
+                        
+                        <div class="mt-3 d-flex">
+                            <button class="btn btn-primary me-2" id="uploadButton">上传文件</button>
+                            <button class="btn btn-outline-secondary" id="clearFilesButton">清空选择</button>
+                        </div>
+                        <div class="mt-3" id="uploadStatus"></div>
+                    </div>
+                    
+                    <!-- URL导入子标签页 -->
+                    <div class="tab-pane fade" id="url-content" role="tabpanel" aria-labelledby="url-tab">
+                        <div class="mb-3">
+                            <label for="urlInput" class="form-label">URL地址</label>
+                            <input type="url" class="form-control" id="urlInput" placeholder="https://example.com/document.pdf">
+                        </div>
+                        <div class="mb-3">
+                            <label for="urlTitleInput" class="form-label">文档标题</label>
+                            <input type="text" class="form-control" id="urlTitleInput" placeholder="文档标题">
+                        </div>
+                        <button class="btn btn-primary" id="urlSubmitButton">提交URL</button>
+                        <div class="mt-3" id="urlStatus"></div>
+                    </div>
+                    
+                    <!-- 文本输入子标签页 -->
+                    <div class="tab-pane fade" id="text-content" role="tabpanel" aria-labelledby="text-tab">
+                        <div class="mb-3">
+                            <label for="textTitleInput" class="form-label">文档标题</label>
+                            <input type="text" class="form-control" id="textTitleInput" placeholder="文档标题">
+                        </div>
+                        <div class="mb-3">
+                            <label for="textContentInput" class="form-label">文档内容</label>
+                            <textarea class="form-control" id="textContentInput" rows="10" placeholder="在此输入文档内容..."></textarea>
+                        </div>
+                        <button class="btn btn-primary" id="textSubmitButton">提交文本</button>
+                        <div class="mt-3" id="textStatus"></div>
+                    </div>
+                    
+                    <!-- 管理文档子标签页 -->
+                    <div class="tab-pane fade" id="manage-content" role="tabpanel" aria-labelledby="manage-tab">
+                        <div class="table-responsive">
+                            <table class="table table-striped" id="documentsTable">
+                                <thead>
+                                    <tr>
+                                        <th>ID</th>
+                                        <th>标题</th>
+                                        <th>类型</th>
+                                        <th>状态</th>
+                                        <th>索引时间</th>
+                                        <th>操作</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <tr>
+                                        <td colspan="6" class="text-center">暂无文档</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- 查询历史标签页 -->
+            <div class="tab-pane fade" id="history" role="tabpanel" aria-labelledby="history-tab">
+                <h3 class="mb-4">查询历史</h3>
+                <div class="table-responsive">
+                    <table class="table table-striped" id="historyTable">
+                        <thead>
+                            <tr>
+                                <th>ID</th>
+                                <th>查询内容</th>
+                                <th>时间</th>
+                                <th>状态</th>
+                                <th>操作</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td colspan="5" class="text-center">暂无查询历史</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+            
+            <!-- 设置标签页 -->
+            <div class="tab-pane fade" id="settings" role="tabpanel" aria-labelledby="settings-tab">
+                <h3 class="mb-4">系统设置</h3>
+                
+                <form id="settingsForm">
+                    <div class="mb-3">
+                        <label for="topKInput" class="form-label">检索文档数量 (Top-K)</label>
+                        <input type="number" class="form-control" id="topKInput" min="1" max="20" value="5">
+                        <div class="form-text">检索时返回的相关文档片段数量</div>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="similarityThresholdInput" class="form-label">相似度阈值</label>
+                        <input type="range" class="form-range" id="similarityThresholdInput" min="0" max="1" step="0.01" value="0.7">
+                        <div class="d-flex justify-content-between">
+                            <span>0.0</span>
+                            <span id="similarityThresholdValue">0.7</span>
+                            <span>1.0</span>
+                        </div>
+                        <div class="form-text">检索结果的最低相似度要求</div>
+                    </div>
+                    
+                    <div class="mb-3 form-check">
+                        <input type="checkbox" class="form-check-input" id="rerankerCheck" checked>
+                        <label class="form-check-label" for="rerankerCheck">启用检索结果重排序</label>
+                        <div class="form-text">使用精确模型对检索结果进行重新排序</div>
+                    </div>
+                    
+                    <div class="mb-3 form-check">
+                        <input type="checkbox" class="form-check-input" id="multiQueryCheck" checked>
+                        <label class="form-check-label" for="multiQueryCheck">启用多查询变体</label>
+                        <div class="form-text">生成多个查询变体以提高召回率</div>
+                    </div>
+                    
+                    <div class="mb-3 form-check">
+                        <input type="checkbox" class="form-check-input" id="selfCorrectionCheck" checked>
+                        <label class="form-check-label" for="selfCorrectionCheck">启用自我纠正</label>
+                        <div class="form-text">使用LLM评估和纠正生成的回答</div>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="modelSelect" class="form-label">生成模型</label>
+                        <select class="form-select" id="modelSelect">
+                            <option value="gpt-3.5-turbo">GPT-3.5-Turbo</option>
+                            <option value="gpt-4">GPT-4</option>
+                        </select>
+                        <div class="form-text">用于生成回答的语言模型</div>
+                    </div>
+                    
+                    <button type="submit" class="btn btn-primary">保存设置</button>
+                </form>
+            </div>
+        </div>
+        
+        <footer class="mt-5 text-center text-muted">
+            <p>企业级RAG系统 &copy; 2025 Enterprise RAG Team</p>
+        </footer>
+    </div>
+    
+    <!-- 来源信息弹窗 -->
+    <div class="modal fade" id="sourceModal" tabindex="-1" aria-labelledby="sourceModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="sourceModalLabel">来源信息</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body" id="sourceModalBody">
+                    <!-- 来源信息内容 -->
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">关闭</button>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <!-- 引入API客户端，使用相对路径 -->
+    <script src="js/rag-api.js"></script>
+    <script src="js/rag-client.js"></script>
+    <script>
+        // 调试日志函数
+        function debugLog(message) {
+            console.log(message);
+            const debugPanel = document.getElementById('debugPanel');
+            if (debugPanel) {
+                const logLine = document.createElement('div');
+                logLine.textContent = `[${new Date().toLocaleTimeString()}] ${message}`;
+                debugPanel.appendChild(logLine);
+                debugPanel.scrollTop = debugPanel.scrollHeight;
+            }
+        }
+
+        // 显示调试面板
+        function showDebugPanel() {
+            const debugPanel = document.getElementById('debugPanel');
+            if (debugPanel) {
+                debugPanel.style.display = 'block';
+            }
+        }
+
+        // 捕获所有错误
+        window.onerror = function(message, source, lineno, colno, error) {
+            debugLog(`ERROR: ${message} at ${source}:${lineno}:${colno}`);
+            showDebugPanel();
+            return false;
+        };
+
+        // 页面加载完成后初始化
+        document.addEventListener('DOMContentLoaded', function() {
+            debugLog('DOM加载完成，初始化开始');
+            
+            // 显示调试面板（开发环境使用）
+            showDebugPanel();
+
+            try {
+                // 获取DOM元素
+                const userInput = document.getElementById('userInput');
+                const sendButton = document.getElementById('sendButton');
+                const chatMessages = document.getElementById('chatMessages');
+                const progressIndicator = document.getElementById('progressIndicator');
+                
+                debugLog('DOM元素获取成功');
+                
+                // 手动设置API基础URL - 指向后端API服务器
+                const API_BASE_URL = "http://localhost:8091";
+                
+                // 默认用户ID
+                const DEFAULT_USER_ID = 'anonymous';
+                
+                // 初始化时获取或创建会话ID
+                const sessionId = getOrCreateSessionId();
+                debugLog(`会话ID: ${sessionId}`);
+                
+                // 初始化时加载用户设置
+                debugLog('加载用户设置...');
+                loadUserSettings();
+                
+                // 发送按钮点击事件
+                debugLog('绑定发送按钮点击事件');
+                if (sendButton) {
+                    sendButton.addEventListener('click', function() {
+                        debugLog('发送按钮被点击');
+                        sendMessage();
+                    });
+                } else {
+                    debugLog('警告: 找不到发送按钮元素');
+                }
+                
+                // 输入框回车事件
+                if (userInput) {
+                    userInput.addEventListener('keypress', function(event) {
+                        if (event.key === 'Enter') {
+                            debugLog('检测到回车键');
+                            sendMessage();
+                        }
+                    });
+                } else {
+                    debugLog('警告: 找不到用户输入框元素');
+                }
+                
+                // 标签切换事件处理
+                const documentTab = document.getElementById('document-tab');
+                const historyTab = document.getElementById('history-tab');
+                
+                if (documentTab) {
+                    documentTab.addEventListener('click', function() {
+                        debugLog('文档标签被点击');
+                        loadDocuments();
+                    });
+                }
+                
+                if (historyTab) {
+                    historyTab.addEventListener('click', function() {
+                        debugLog('历史标签被点击');
+                        loadHistory();
+                    });
+                }
+                
+                // 发送消息
+                function sendMessage() {
+                    try {
+                        debugLog('执行sendMessage函数');
+                        const message = userInput.value.trim();
+                        if (message === '') {
+                            debugLog('消息为空，不发送请求');
+                            return;
+                        }
+                        
+                        debugLog(`发送消息: "${message}"`);
+                        
+                        // 添加用户消息到聊天窗口
+                        addMessage(message, 'user');
+                        
+                        // 清空输入框
+                        userInput.value = '';
+                        
+                        // 显示进度指示器
+                        progressIndicator.style.display = 'block';
+                        debugLog('显示进度指示器');
+                        
+                        // 调用API
+                        const advancedRag = document.getElementById('advancedRagSwitch').checked;
+                        
+                        const params = {
+                            topK: parseInt(document.getElementById('topKInput').value || '5'),
+                            similarityThreshold: parseFloat(document.getElementById('similarityThresholdInput').value || '0.7'),
+                            rerankerEnabled: document.getElementById('rerankerCheck').checked,
+                            multiQueryEnabled: advancedRag && document.getElementById('multiQueryCheck').checked,
+                            selfCorrectionEnabled: advancedRag && document.getElementById('selfCorrectionCheck').checked,
+                            model: document.getElementById('modelSelect').value
+                        };
+                        
+                        // 直接使用fetch进行查询，确保请求能发出
+                        const requestData = {
+                            query: message,
+                            userId: DEFAULT_USER_ID,
+                            sessionId: sessionId,
+                            params: params
+                        };
+                        
+                        debugLog(`准备发送API请求: ${JSON.stringify(requestData)}`);
+                        
+                        fetch(`${API_BASE_URL}/api/rag/query`, {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json'
+                            },
+                            body: JSON.stringify(requestData)
+                        })
+                        .then(response => {
+                            debugLog(`查询响应状态: ${response.status}`);
+                            if (!response.ok) {
+                                throw new Error(`API错误: ${response.status}`);
+                            }
+                            return response.json();
+                        })
+                        .then(data => {
+                            debugLog(`查询响应数据: ${JSON.stringify(data)}`);
+                            // 隐藏进度指示器
+                            progressIndicator.style.display = 'none';
+                            
+                            // 添加系统回复
+                            addResponse(data);
+                        })
+                        .catch(error => {
+                            debugLog(`查询错误: ${error.message}`);
+                            // 隐藏进度指示器
+                            progressIndicator.style.display = 'none';
+                            
+                            // 显示错误消息
+                            const errorResponse = {
+                                answer: `查询处理出错: ${error.message}。请稍后再试。`,
+                                status: 'ERROR'
+                            };
+                            addResponse(errorResponse);
+                        });
+                    } catch (e) {
+                        debugLog(`sendMessage函数执行错误: ${e.message}`);
+                    }
+                }
+                
+                // 添加消息到聊天窗口
+                function addMessage(text, sender) {
+                    try {
+                        const messageContainer = document.createElement('div');
+                        messageContainer.className = 'message-container';
+                        
+                        const message = document.createElement('div');
+                        message.className = sender === 'user' ? 'user-message' : 'system-message';
+                        message.textContent = text;
+                        
+                        const meta = document.createElement('div');
+                        meta.className = 'message-meta';
+                        meta.textContent = sender === 'user' ? '您 - ' + getCurrentTime() : '系统 - ' + getCurrentTime();
+                        
+                        messageContainer.appendChild(message);
+                        messageContainer.appendChild(meta);
+                        
+                        chatMessages.appendChild(messageContainer);
+                        chatMessages.scrollTop = chatMessages.scrollHeight;
+                        
+                        debugLog(`添加${sender}消息: "${text.substring(0, 50)}${text.length > 50 ? '...' : ''}"`);
+                    } catch (e) {
+                        debugLog(`添加消息错误: ${e.message}`);
+                    }
+                }
+                
+                // 添加系统响应
+                function addResponse(response) {
+                    try {
+                        debugLog('添加系统响应');
+                        const messageContainer = document.createElement('div');
+                        messageContainer.className = 'message-container';
+                        
+                        const message = document.createElement('div');
+                        message.className = 'system-message';
+                        message.textContent = response.answer;
+                        
+                        // 如果有来源信息，添加来源引用
+                        if (response.sources && response.sources.length > 0) {
+                            debugLog(`响应包含${response.sources.length}个来源`);
+                            const sourceRef = document.createElement('div');
+                            sourceRef.className = 'source-reference';
+                            sourceRef.innerHTML = '来源: ';
+                            
+                            response.sources.forEach((source, index) => {
+                                const sourceLink = document.createElement('span');
+                                sourceLink.className = 'source-info';
+                                sourceLink.textContent = source.title;
+                                sourceLink.onclick = () => showSourceInfo(source);
+                                
+                                sourceRef.appendChild(sourceLink);
+                                
+                                if (index < response.sources.length - 1) {
+                                    sourceRef.appendChild(document.createTextNode(', '));
+                                }
+                            });
+                            
+                            message.appendChild(sourceRef);
+                        }
+                        
+                        // 如果有评估指标，添加评估信息
+                        if (response.evaluationMetrics) {
+                            debugLog('响应包含评估指标');
+                            const metrics = document.createElement('div');
+                            metrics.className = 'evaluation-metrics';
+                            
+                            if (response.evaluationMetrics.faithfulness !== undefined) {
+                                const faithfulness = document.createElement('div');
+                                faithfulness.innerHTML = `忠实度: <span class="rating">${getRatingStars(response.evaluationMetrics.faithfulness)}</span> (${Math.round(response.evaluationMetrics.faithfulness * 100)}%)`;
+                                metrics.appendChild(faithfulness);
+                            }
+                            
+                            if (response.evaluationMetrics.relevance !== undefined) {
+                                const relevance = document.createElement('div');
+                                relevance.innerHTML = `相关性: <span class="rating">${getRatingStars(response.evaluationMetrics.relevance)}</span> (${Math.round(response.evaluationMetrics.relevance * 100)}%)`;
+                                metrics.appendChild(relevance);
+                            }
+                            
+                            message.appendChild(metrics);
+                        }
+                        
+                        const meta = document.createElement('div');
+                        meta.className = 'message-meta';
+                        meta.textContent = '系统 - ' + getCurrentTime();
+                        
+                        messageContainer.appendChild(message);
+                        messageContainer.appendChild(meta);
+                        
+                        chatMessages.appendChild(messageContainer);
+                        chatMessages.scrollTop = chatMessages.scrollHeight;
+                    } catch (e) {
+                        debugLog(`添加系统响应错误: ${e.message}`);
+                    }
+                }
+                
+                // 获取评分星星
+                function getRatingStars(score) {
+                    try {
+                        const fullStars = Math.floor(score * 5);
+                        let stars = '';
+                        for (let i = 0; i < 5; i++) {
+                            stars += i < fullStars ? '★' : '☆';
+                        }
+                        return stars;
+                    } catch (e) {
+                        debugLog(`获取评分星星错误: ${e.message}`);
+                        return "★★★";
+                    }
+                }
+                
+                // 显示来源信息
+                function showSourceInfo(source) {
+                    try {
+                        debugLog(`显示来源信息: ID=${source.id}, 标题=${source.title}`);
+                        const modalBody = document.getElementById('sourceModalBody');
+                        if (!modalBody) {
+                            debugLog('错误: 找不到来源模态框内容元素');
+                            return;
+                        }
+                        
+                        // 直接使用fetch
+                        fetch(`${API_BASE_URL}/api/rag/documents/${source.id}/sources`)
+                            .then(response => {
+                                debugLog(`来源信息响应状态: ${response.status}`);
+                                if (!response.ok) {
+                                    throw new Error(`获取文档源信息失败: ${response.status}`);
+                                }
+                                return response.json();
+                            })
+                            .then(sources => {
+                                debugLog(`接收到${sources ? sources.length : 0}个来源信息`);
+                                modalBody.innerHTML = `
+                                    <h5>${source.title}</h5>
+                                    <p>文档ID: ${source.id}</p>
+                                    <hr>
+                                    <h6>相关片段:</h6>
+                                `;
+                                
+                                if (sources && sources.length > 0) {
+                                    sources.forEach(chunk => {
+                                        const chunkDiv = document.createElement('div');
+                                        chunkDiv.className = 'mb-3 p-2 bg-light border rounded';
+                                        chunkDiv.textContent = chunk.chunk_content || chunk.snippet || '没有可用内容';
+                                        modalBody.appendChild(chunkDiv);
+                                    });
+                                } else {
+                                    modalBody.innerHTML += '<p>没有找到文档内容</p>';
+                                }
+                            })
+                            .catch(error => {
+                                debugLog(`获取文档源信息错误: ${error.message}`);
+                                modalBody.innerHTML = `
+                                    <h5>${source.title}</h5>
+                                    <p>文档ID: ${source.id}</p>
+                                    <div class="alert alert-danger">获取文档详情失败: ${error.message}</div>
+                                `;
+                            });
+                        
+                        const modalElement = document.getElementById('sourceModal');
+                        if (modalElement) {
+                            const modal = new bootstrap.Modal(modalElement);
+                            modal.show();
+                        } else {
+                            debugLog('错误: 找不到来源模态框元素');
+                        }
+                    } catch (e) {
+                        debugLog(`showSourceInfo函数执行错误: ${e.message}`);
+                    }
+                }
+                
+                // 获取当前时间
+                function getCurrentTime() {
+                    try {
+                        const now = new Date();
+                        const hours = String(now.getHours()).padStart(2, '0');
+                        const minutes = String(now.getMinutes()).padStart(2, '0');
+                        return `今天 ${hours}:${minutes}`;
+                    } catch (e) {
+                        debugLog(`获取当前时间错误: ${e.message}`);
+                        return "当前时间";
+                    }
+                }
+                
+                // 获取或创建会话ID
+                function getOrCreateSessionId() {
+                    try {
+                        let sessionId = localStorage.getItem('rag_session_id');
+                        if (!sessionId) {
+                            sessionId = 'session_' + new Date().getTime();
+                            localStorage.setItem('rag_session_id', sessionId);
+                            debugLog(`创建新会话ID: ${sessionId}`);
+                        } else {
+                            debugLog(`使用已有会话ID: ${sessionId}`);
+                        }
+                        return sessionId;
+                    } catch (e) {
+                        debugLog(`获取会话ID错误: ${e.message}`);
+                        return 'session_fallback_' + new Date().getTime();
+                    }
+                }
+                
+                // 相似度阈值显示
+                const similarityThresholdInput = document.getElementById('similarityThresholdInput');
+                const similarityThresholdValue = document.getElementById('similarityThresholdValue');
+                
+                similarityThresholdInput.addEventListener('input', function() {
+                    similarityThresholdValue.textContent = this.value;
+                });
+                
+                // 文件上传相关
+                const dropZone = document.getElementById('dropZone');
+                const fileInput = document.getElementById('fileInput');
+                const uploadButton = document.getElementById('uploadButton');
+                const clearFilesButton = document.getElementById('clearFilesButton');
+                const uploadStatus = document.getElementById('uploadStatus');
+                const selectedFiles = document.getElementById('selectedFiles');
+                const fileList = document.getElementById('fileList');
+                
+                // 添加文件至列表并显示
+                function updateFileList() {
+                    try {
+                        debugLog('更新文件列表');
+                        
+                        if (!fileInput.files || fileInput.files.length === 0) {
+                            selectedFiles.classList.add('d-none');
+                            fileList.innerHTML = '';
+                            return;
+                        }
+                        
+                        selectedFiles.classList.remove('d-none');
+                        fileList.innerHTML = '';
+                        
+                        Array.from(fileInput.files).forEach((file, index) => {
+                            const fileItem = document.createElement('div');
+                            fileItem.className = 'file-item';
+                            fileItem.dataset.index = index;
+                            
+                            const fileName = document.createElement('div');
+                            fileName.className = 'file-name';
+                            fileName.textContent = file.name;
+                            
+                            const fileSize = document.createElement('div');
+                            fileSize.className = 'file-size';
+                            fileSize.textContent = formatFileSize(file.size);
+                            
+                            const removeBtn = document.createElement('div');
+                            removeBtn.className = 'file-remove';
+                            removeBtn.textContent = '×';
+                            removeBtn.title = '移除文件';
+                            removeBtn.onclick = function() {
+                                removeFile(index);
+                            };
+                            
+                            fileItem.appendChild(fileName);
+                            fileItem.appendChild(fileSize);
+                            fileItem.appendChild(removeBtn);
+                            fileList.appendChild(fileItem);
+                        });
+                        
+                        debugLog(`文件列表已更新，共${fileInput.files.length}个文件`);
+                    } catch (e) {
+                        debugLog(`更新文件列表出错: ${e.message}`);
+                    }
+                }
+                
+                // 移除文件
+                function removeFile(index) {
+                    try {
+                        debugLog(`准备移除文件，索引: ${index}`);
+                        
+                        // 由于FileList是只读的，需要创建新的DataTransfer对象
+                        const dt = new DataTransfer();
+                        const files = fileInput.files;
+                        
+                        for (let i = 0; i < files.length; i++) {
+                            if (i !== index) {
+                                dt.items.add(files[i]);
+                            } else {
+                                debugLog(`移除文件: ${files[i].name}`);
+                            }
+                        }
+                        
+                        // 更新文件输入控件
+                        fileInput.files = dt.files;
+                        
+                        // 更新显示的文件列表
+                        updateFileList();
+                    } catch (e) {
+                        debugLog(`移除文件出错: ${e.message}`);
+                        alert(`无法移除文件: ${e.message}`);
+                    }
+                }
+                
+                // 格式化文件大小
+                function formatFileSize(bytes) {
+                    if (bytes === 0) return '0 Bytes';
+                    
+                    const k = 1024;
+                    const sizes = ['Bytes', 'KB', 'MB', 'GB', 'TB'];
+                    const i = Math.floor(Math.log(bytes) / Math.log(k));
+                    
+                    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+                }
+                
+                // 清空所有选择的文件
+                clearFilesButton.addEventListener('click', function() {
+                    try {
+                        debugLog('清空文件选择');
+                        fileInput.value = '';
+                        updateFileList();
+                        uploadStatus.innerHTML = '';
+                    } catch (e) {
+                        debugLog(`清空文件选择出错: ${e.message}`);
+                    }
+                });
+                
+                // 点击上传区域时打开文件选择对话框
+                dropZone.addEventListener('click', function() {
+                    fileInput.click();
+                });
+                
+                // 文件选择改变时更新文件列表
+                fileInput.addEventListener('change', function() {
+                    debugLog('文件选择已更改');
+                    updateFileList();
+                });
+                
+                // 拖放相关事件
+                dropZone.addEventListener('dragover', function(e) {
+                    e.preventDefault();
+                    this.classList.add('border-primary');
+                });
+                
+                dropZone.addEventListener('dragleave', function() {
+                    this.classList.remove('border-primary');
+                });
+                
+                dropZone.addEventListener('drop', function(e) {
+                    e.preventDefault();
+                    this.classList.remove('border-primary');
+                    
+                    if (e.dataTransfer.files.length > 0) {
+                        debugLog(`拖放了${e.dataTransfer.files.length}个文件`);
+                        fileInput.files = e.dataTransfer.files;
+                        updateFileList();
+                    }
+                });
+                
+                // 文件上传
+                uploadButton.addEventListener('click', function() {
+                    if (!fileInput.files || fileInput.files.length === 0) {
+                        uploadStatus.innerHTML = '<div class="alert alert-warning">请选择文件</div>';
+                        return;
+                    }
+                    
+                    uploadStatus.innerHTML = '<div class="spinner-border text-primary" role="status"><span class="visually-hidden">上传中...</span></div> 文件上传中...';
+                    
+                    const files = fileInput.files;
+                    const formData = new FormData();
+                    
+                    // 添加所有文件
+                    for (let i = 0; i < files.length; i++) {
+                        formData.append('file', files[i]);
+                        debugLog(`添加文件到表单: ${files[i].name} (${formatFileSize(files[i].size)})`);
+                    }
+                    
+                    // 添加元数据
+                    const metadata = {
+                        uploadedBy: DEFAULT_USER_ID,
+                        uploadTime: new Date().toISOString()
+                    };
+                    formData.append('metadata', JSON.stringify(metadata));
+                    
+                    debugLog('开始上传文件...');
+                    fetch(`${API_BASE_URL}/api/rag/documents/upload`, {
+                        method: 'POST',
+                        body: formData
+                    })
+                    .then(response => {
+                        debugLog(`上传响应状态: ${response.status}`);
+                        if (!response.ok) {
+                            throw new Error(`文件上传失败: ${response.status}`);
+                        }
+                        return response.json();
+                    })
+                    .then(data => {
+                        debugLog('文件上传成功');
+                        uploadStatus.innerHTML = '<div class="alert alert-success">文件上传成功!</div>';
+                        // 清空文件选择
+                        fileInput.value = '';
+                        updateFileList();
+                        // 刷新文档列表
+                        loadDocuments();
+                    })
+                    .catch(error => {
+                        debugLog(`文件上传错误: ${error.message}`);
+                        uploadStatus.innerHTML = `<div class="alert alert-danger">上传失败: ${error.message}</div>`;
+                    });
+                });
+                
+                // URL导入
+                const urlSubmitButton = document.getElementById('urlSubmitButton');
+                const urlInput = document.getElementById('urlInput');
+                const urlTitleInput = document.getElementById('urlTitleInput');
+                const urlStatus = document.getElementById('urlStatus');
+                
+                urlSubmitButton.addEventListener('click', function() {
+                    const url = urlInput.value.trim();
+                    const title = urlTitleInput.value.trim();
+                    
+                    if (!url) {
+                        urlStatus.innerHTML = '<div class="alert alert-warning">请输入URL</div>';
+                        return;
+                    }
+                    
+                    urlStatus.innerHTML = '<div class="spinner-border text-primary" role="status"><span class="visually-hidden">处理中...</span></div> URL处理中...';
+                    
+                    const requestData = {
+                        url: url,
+                        metadata: {
+                            title: title,
+                            uploadedBy: DEFAULT_USER_ID,
+                            uploadTime: new Date().toISOString()
+                        }
+                    };
+                    
+                    // 使用直接的fetch调用
+                    fetch(`${API_BASE_URL}/api/rag/documents/url`, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify(requestData)
+                    })
+                    .then(response => {
+                        if (!response.ok) {
+                            throw new Error(`URL导入失败: ${response.status}`);
+                        }
+                        return response.json();
+                    })
+                    .then(data => {
+                        urlStatus.innerHTML = '<div class="alert alert-success">URL导入成功!</div>';
+                        urlInput.value = '';
+                        urlTitleInput.value = '';
+                        loadDocuments();
+                    })
+                    .catch(error => {
+                        console.error('URL导入错误:', error);
+                        urlStatus.innerHTML = `<div class="alert alert-danger">导入失败: ${error.message}</div>`;
+                    });
+                });
+                
+                // 文本提交
+                const textSubmitButton = document.getElementById('textSubmitButton');
+                const textTitleInput = document.getElementById('textTitleInput');
+                const textContentInput = document.getElementById('textContentInput');
+                const textStatus = document.getElementById('textStatus');
+                
+                textSubmitButton.addEventListener('click', function() {
+                    const title = textTitleInput.value.trim();
+                    const content = textContentInput.value.trim();
+                    
+                    if (!title || !content) {
+                        textStatus.innerHTML = '<div class="alert alert-warning">标题和内容不能为空</div>';
+                        return;
+                    }
+                    
+                    textStatus.innerHTML = '<div class="spinner-border text-primary" role="status"><span class="visually-hidden">处理中...</span></div> 文本处理中...';
+                    
+                    const requestData = {
+                        title: title,
+                        content: content,
+                        metadata: {
+                            uploadedBy: DEFAULT_USER_ID,
+                            uploadTime: new Date().toISOString()
+                        }
+                    };
+                    
+                    // 使用直接的fetch调用
+                    fetch(`${API_BASE_URL}/api/rag/documents/text`, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify(requestData)
+                    })
+                    .then(response => {
+                        if (!response.ok) {
+                            throw new Error(`文本提交失败: ${response.status}`);
+                        }
+                        return response.json();
+                    })
+                    .then(data => {
+                        textStatus.innerHTML = '<div class="alert alert-success">文本提交成功!</div>';
+                        textTitleInput.value = '';
+                        textContentInput.value = '';
+                        loadDocuments();
+                    })
+                    .catch(error => {
+                        console.error('文本提交错误:', error);
+                        textStatus.innerHTML = `<div class="alert alert-danger">提交失败: ${error.message}</div>`;
+                    });
+                });
+                
+                // 加载文档列表
+                function loadDocuments() {
+                    try {
+                        debugLog('执行loadDocuments函数');
+                        const documentsTable = document.getElementById('documentsTable');
+                        if (!documentsTable) {
+                            debugLog('错误: 找不到文档表格元素');
+                            return;
+                        }
+                        
+                        const tbody = documentsTable.getElementsByTagName('tbody')[0];
+                        if (!tbody) {
+                            debugLog('错误: 文档表格没有tbody元素');
+                            return;
+                        }
+                        
+                        debugLog(`加载文档列表: ${DEFAULT_USER_ID}`);
+                        
+                        fetch(`${API_BASE_URL}/api/rag/documents?page=0&size=10`)
+                            .then(response => {
+                                debugLog(`文档列表响应状态: ${response.status}`);
+                                if (!response.ok) {
+                                    throw new Error(`获取文档列表失败: ${response.status}`);
+                                }
+                                return response.json();
+                            })
+                            .then(data => {
+                                debugLog(`接收到${data.documents ? data.documents.length : 0}条文档`);
+                                // 清空表格
+                                tbody.innerHTML = '';
+                                
+                                if (data.documents && data.documents.length > 0) {
+                                    data.documents.forEach(doc => {
+                                        const row = tbody.insertRow();
+                                        
+                                        row.insertCell(0).textContent = doc.id;
+                                        row.insertCell(1).textContent = doc.title;
+                                        row.insertCell(2).textContent = doc.type || '未知';
+                                        row.insertCell(3).textContent = doc.status;
+                                        row.insertCell(4).textContent = formatDateTime(doc.createTime);
+                                        
+                                        const actionsCell = row.insertCell(5);
+                                        actionsCell.innerHTML = `
+                                            <button class="btn btn-sm btn-outline-info view-btn" data-id="${doc.id}">查看</button>
+                                            <button class="btn btn-sm btn-outline-warning reprocess-btn" data-id="${doc.id}">重新处理</button>
+                                            <button class="btn btn-sm btn-outline-danger delete-btn" data-id="${doc.id}">删除</button>
+                                        `;
+                                    });
+                                    
+                                    // 添加事件处理
+                                    document.querySelectorAll('.view-btn').forEach(btn => {
+                                        btn.addEventListener('click', function() {
+                                            const docId = this.getAttribute('data-id');
+                                            viewDocument(docId);
+                                        });
+                                    });
+                                    
+                                    document.querySelectorAll('.reprocess-btn').forEach(btn => {
+                                        btn.addEventListener('click', function() {
+                                            const docId = this.getAttribute('data-id');
+                                            reprocessDocument(docId);
+                                        });
+                                    });
+                                    
+                                    document.querySelectorAll('.delete-btn').forEach(btn => {
+                                        btn.addEventListener('click', function() {
+                                            const docId = this.getAttribute('data-id');
+                                            deleteDocument(docId);
+                                        });
+                                    });
+                                } else {
+                                    tbody.innerHTML = '<tr><td colspan="6" class="text-center">暂无文档</td></tr>';
+                                }
+                            })
+                            .catch(error => {
+                                debugLog(`加载文档列表错误: ${error.message}`);
+                                tbody.innerHTML = `<tr><td colspan="6" class="text-center text-danger">加载失败: ${error.message}</td></tr>`;
+                            });
+                    } catch (e) {
+                        debugLog(`loadDocuments函数执行错误: ${e.message}`);
+                    }
+                }
+                
+                // 查看文档
+                function viewDocument(docId) {
+                    try {
+                        debugLog(`查看文档: ID=${docId}`);
+                        
+                        fetch(`${API_BASE_URL}/api/rag/documents/${docId}`)
+                            .then(response => {
+                                debugLog(`文档详情响应状态: ${response.status}`);
+                                if (!response.ok) {
+                                    throw new Error(`获取文档详情失败: ${response.status}`);
+                                }
+                                return response.json();
+                            })
+                            .then(doc => {
+                                debugLog(`接收到文档详情: ID=${doc.id}, 标题=${doc.title}`);
+                                const modalBody = document.getElementById('sourceModalBody');
+                                modalBody.innerHTML = `
+                                    <h5>${doc.title}</h5>
+                                    <p><strong>ID:</strong> ${doc.id}</p>
+                                    <p><strong>状态:</strong> ${doc.status}</p>
+                                    <p><strong>创建时间:</strong> ${formatDateTime(doc.createTime)}</p>
+                                    <hr>
+                                    <h6>文档内容预览:</h6>
+                                    <div class="border p-2 bg-light">${doc.content ? doc.content.substring(0, 500) + '...' : '无内容预览'}</div>
+                                `;
+                                
+                                const modal = new bootstrap.Modal(document.getElementById('sourceModal'));
+                                modal.show();
+                            })
+                            .catch(error => {
+                                debugLog(`查看文档错误: ${error.message}`);
+                                alert(`查看文档失败: ${error.message}`);
+                            });
+                    } catch (e) {
+                        debugLog(`viewDocument函数执行错误: ${e.message}`);
+                    }
+                }
+                
+                // 重新处理文档
+                function reprocessDocument(docId) {
+                    try {
+                        if (confirm('确定要重新处理该文档吗？')) {
+                            debugLog(`重新处理文档: ID=${docId}`);
+                            
+                            fetch(`${API_BASE_URL}/api/rag/documents/${docId}/reprocess`, {
+                                method: 'POST'
+                            })
+                                .then(response => {
+                                    debugLog(`重新处理响应状态: ${response.status}`);
+                                    if (!response.ok) {
+                                        throw new Error(`重新处理文档失败: ${response.status}`);
+                                    }
+                                    return response.json();
+                                })
+                                .then(data => {
+                                    debugLog('文档重新处理已启动');
+                                    alert('文档重新处理已启动');
+                                    loadDocuments();
+                                })
+                                .catch(error => {
+                                    debugLog(`重新处理错误: ${error.message}`);
+                                    alert(`重新处理失败: ${error.message}`);
+                                });
+                        }
+                    } catch (e) {
+                        debugLog(`reprocessDocument函数执行错误: ${e.message}`);
+                    }
+                }
+                
+                // 删除文档
+                function deleteDocument(docId) {
+                    try {
+                        if (confirm('确定要删除该文档吗？此操作不可恢复！')) {
+                            debugLog(`删除文档: ID=${docId}`);
+                            
+                            fetch(`${API_BASE_URL}/api/rag/documents/${docId}`, {
+                                method: 'DELETE'
+                            })
+                                .then(response => {
+                                    debugLog(`删除响应状态: ${response.status}`);
+                                    if (!response.ok) {
+                                        throw new Error(`删除文档失败: ${response.status}`);
+                                    }
+                                    return response.json();
+                                })
+                                .then(data => {
+                                    if (data.success) {
+                                        debugLog('文档删除成功');
+                                        alert('文档已成功删除');
+                                        loadDocuments();
+                                    } else {
+                                        throw new Error('删除失败');
+                                    }
+                                })
+                                .catch(error => {
+                                    debugLog(`删除错误: ${error.message}`);
+                                    alert(`删除失败: ${error.message}`);
+                                });
+                        }
+                    } catch (e) {
+                        debugLog(`deleteDocument函数执行错误: ${e.message}`);
+                    }
+                }
+                
+                // 加载查询历史
+                function loadHistory() {
+                    try {
+                        debugLog('执行loadHistory函数');
+                        const historyTable = document.getElementById('historyTable');
+                        if (!historyTable) {
+                            debugLog('错误: 找不到历史表格元素');
+                            return;
+                        }
+                        
+                        const tbody = historyTable.getElementsByTagName('tbody')[0];
+                        if (!tbody) {
+                            debugLog('错误: 历史表格没有tbody元素');
+                            return;
+                        }
+                        
+                        debugLog(`加载用户历史记录: ${DEFAULT_USER_ID}`);
+                        
+                        fetch(`${API_BASE_URL}/api/rag/history/user/${DEFAULT_USER_ID}?limit=20`)
+                            .then(response => {
+                                debugLog(`历史记录响应状态: ${response.status}`);
+                                if (!response.ok) {
+                                    throw new Error(`获取历史记录失败: ${response.status}`);
+                                }
+                                return response.json();
+                            })
+                            .then(queries => {
+                                debugLog(`接收到${queries ? queries.length : 0}条历史记录`);
+                                // 清空表格
+                                tbody.innerHTML = '';
+                                
+                                if (queries && queries.length > 0) {
+                                    queries.forEach(query => {
+                                        const row = tbody.insertRow();
+                                        
+                                        row.insertCell(0).textContent = query.id;
+                                        row.insertCell(1).textContent = query.originalText;
+                                        row.insertCell(2).textContent = formatDateTime(query.createdAt);
+                                        row.insertCell(3).textContent = query.status;
+                                        
+                                        const actionsCell = row.insertCell(4);
+                                        actionsCell.innerHTML = `
+                                            <button class="btn btn-sm btn-outline-info query-again-btn" data-text="${encodeURIComponent(query.originalText)}">再次查询</button>
+                                            <button class="btn btn-sm btn-outline-secondary view-responses-btn" data-id="${query.id}">查看回复</button>
+                                        `;
+                                    });
+                                    
+                                    // 添加事件处理
+                                    document.querySelectorAll('.query-again-btn').forEach(btn => {
+                                        btn.addEventListener('click', function() {
+                                            const queryText = decodeURIComponent(this.getAttribute('data-text'));
+                                            userInput.value = queryText;
+                                            // 切换到查询标签页
+                                            document.getElementById('chat-tab').click();
+                                            userInput.focus();
+                                        });
+                                    });
+                                    
+                                    document.querySelectorAll('.view-responses-btn').forEach(btn => {
+                                        btn.addEventListener('click', function() {
+                                            const queryId = this.getAttribute('data-id');
+                                            viewResponses(queryId);
+                                        });
+                                    });
+                                } else {
+                                    tbody.innerHTML = '<tr><td colspan="5" class="text-center">暂无查询历史</td></tr>';
+                                }
+                            })
+                            .catch(error => {
+                                debugLog(`加载历史记录错误: ${error.message}`);
+                                tbody.innerHTML = `<tr><td colspan="5" class="text-center text-danger">加载失败: ${error.message}</td></tr>`;
+                            });
+                    } catch (e) {
+                        debugLog(`loadHistory函数执行错误: ${e.message}`);
+                    }
+                }
+                
+                // 查看响应
+                function viewResponses(queryId) {
+                    try {
+                        debugLog(`查看响应: queryID=${queryId}`);
+                        
+                        fetch(`${API_BASE_URL}/api/rag/responses/${queryId}`)
+                            .then(response => {
+                                debugLog(`响应列表状态: ${response.status}`);
+                                if (!response.ok) {
+                                    throw new Error(`获取响应失败: ${response.status}`);
+                                }
+                                return response.json();
+                            })
+                            .then(responses => {
+                                debugLog(`接收到${responses ? responses.length : 0}个响应`);
+                                const modalBody = document.getElementById('sourceModalBody');
+                                modalBody.innerHTML = '<h5>查询响应</h5>';
+                                
+                                if (responses && responses.length > 0) {
+                                    responses.forEach(response => {
+                                        const responseDiv = document.createElement('div');
+                                        responseDiv.className = 'border rounded p-3 mb-3';
+                                        responseDiv.innerHTML = `
+                                            <p><strong>回答:</strong> ${response.answer}</p>
+                                            <p><strong>时间:</strong> ${formatDateTime(response.timestamp)}</p>
+                                            <p><strong>处理类型:</strong> ${response.processingType || '基础RAG'}</p>
+                                            <p><strong>延迟:</strong> ${response.latencyMs ? response.latencyMs + 'ms' : '未知'}</p>
+                                        `;
+                                        
+                                        if (response.evaluationMetrics) {
+                                            let metricsHtml = '<p><strong>评估指标:</strong></p><ul>';
+                                            for (const [key, value] of Object.entries(response.evaluationMetrics)) {
+                                                metricsHtml += `<li>${key}: ${Math.round(value * 100)}%</li>`;
+                                            }
+                                            metricsHtml += '</ul>';
+                                            responseDiv.innerHTML += metricsHtml;
+                                        }
+                                        
+                                        modalBody.appendChild(responseDiv);
+                                    });
+                                } else {
+                                    modalBody.innerHTML += '<p class="text-center">没有找到响应</p>';
+                                }
+                                
+                                const modal = new bootstrap.Modal(document.getElementById('sourceModal'));
+                                modal.show();
+                            })
+                            .catch(error => {
+                                debugLog(`查看响应错误: ${error.message}`);
+                                alert(`查看响应失败: ${error.message}`);
+                            });
+                    } catch (e) {
+                        debugLog(`viewResponses函数执行错误: ${e.message}`);
+                    }
+                }
+                
+                // 格式化日期时间
+                function formatDateTime(dateTimeStr) {
+                    try {
+                        if (!dateTimeStr) return '';
+                        
+                        const date = new Date(dateTimeStr);
+                        return date.toLocaleString('zh-CN', {
+                            year: 'numeric',
+                            month: '2-digit',
+                            day: '2-digit',
+                            hour: '2-digit',
+                            minute: '2-digit',
+                            second: '2-digit'
+                        });
+                    } catch (e) {
+                        debugLog(`格式化日期错误: ${e.message}`);
+                        return dateTimeStr; // 返回原始字符串
+                    }
+                }
+                
+                // 保存用户设置
+                document.getElementById('settingsForm').addEventListener('submit', function(e) {
+                    e.preventDefault();
+                    
+                    try {
+                        const settings = {
+                            topK: parseInt(document.getElementById('topKInput').value),
+                            similarityThreshold: parseFloat(document.getElementById('similarityThresholdInput').value),
+                            rerankerEnabled: document.getElementById('rerankerCheck').checked,
+                            multiQueryEnabled: document.getElementById('multiQueryCheck').checked,
+                            selfCorrectionEnabled: document.getElementById('selfCorrectionCheck').checked,
+                            model: document.getElementById('modelSelect').value
+                        };
+                        
+                        debugLog(`保存用户设置: ${JSON.stringify(settings)}`);
+                        
+                        fetch(`${API_BASE_URL}/api/rag/settings/${DEFAULT_USER_ID}`, {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json'
+                            },
+                            body: JSON.stringify(settings)
+                        })
+                            .then(response => {
+                                debugLog(`设置保存响应状态: ${response.status}`);
+                                if (!response.ok) {
+                                    throw new Error(`保存设置失败: ${response.status}`);
+                                }
+                                return response.json();
+                            })
+                            .then(data => {
+                                debugLog('设置保存成功');
+                                alert('设置已保存！');
+                            })
+                            .catch(error => {
+                                debugLog(`设置保存错误: ${error.message}`);
+                                alert(`保存设置失败: ${error.message}`);
+                            });
+                    } catch (e) {
+                        debugLog(`保存设置错误: ${e.message}`);
+                        alert(`保存设置失败: ${e.message}`);
+                    }
+                });
+                
+                // 加载用户设置实现
+                function loadUserSettings() {
+                    try {
+                        debugLog('执行loadUserSettings函数');
+                        
+                        fetch(`${API_BASE_URL}/api/rag/settings/${DEFAULT_USER_ID}`)
+                            .then(response => {
+                                debugLog(`设置响应状态: ${response.status}`);
+                                if (!response.ok) {
+                                    // 如果没有设置，服务器会返回默认设置
+                                    if (response.status === 404) {
+                                        debugLog('用户没有保存的设置，使用默认设置');
+                                        return {};
+                                    }
+                                    throw new Error(`获取设置失败: ${response.status}`);
+                                }
+                                return response.json();
+                            })
+                            .then(settings => {
+                                debugLog(`接收到用户设置: ${JSON.stringify(settings)}`);
+                                
+                                if (settings.topK) {
+                                    document.getElementById('topKInput').value = settings.topK;
+                                }
+                                
+                                if (settings.similarityThreshold !== undefined) {
+                                    document.getElementById('similarityThresholdInput').value = settings.similarityThreshold;
+                                    document.getElementById('similarityThresholdValue').textContent = settings.similarityThreshold;
+                                }
+                                
+                                if (settings.rerankerEnabled !== undefined) {
+                                    document.getElementById('rerankerCheck').checked = settings.rerankerEnabled;
+                                }
+                                
+                                if (settings.multiQueryEnabled !== undefined) {
+                                    document.getElementById('multiQueryCheck').checked = settings.multiQueryEnabled;
+                                }
+                                
+                                if (settings.selfCorrectionEnabled !== undefined) {
+                                    document.getElementById('selfCorrectionCheck').checked = settings.selfCorrectionEnabled;
+                                }
+                                
+                                if (settings.model) {
+                                    document.getElementById('modelSelect').value = settings.model;
+                                }
+                            })
+                            .catch(error => {
+                                debugLog(`加载用户设置错误: ${error.message}`);
+                            });
+                    } catch (e) {
+                        debugLog(`loadUserSettings函数执行错误: ${e.message}`);
+                    }
+                }
+                
+                debugLog('初始化完成');
+            } catch (e) {
+                debugLog(`初始化过程出错: ${e.message}`);
+            }
+        });
+    </script>
+</body>
+</html>
