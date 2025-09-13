@@ -1,7 +1,7 @@
 package cn.cug.sxy.ai.infrastructure.repository;
 
-import cn.cug.sxy.ai.domain.document.model.entity.Vector;
-import cn.cug.sxy.ai.domain.document.repository.IVectorRepository;
+import cn.cug.sxy.ai.domain.rag.model.entity.Vector;
+import cn.cug.sxy.ai.domain.rag.repository.IVectorRepository;
 import cn.cug.sxy.ai.infrastructure.dao.IVectorDao;
 import cn.cug.sxy.ai.infrastructure.dao.converter.VectorConverter;
 import cn.cug.sxy.ai.infrastructure.dao.po.VectorPO;

@@ -1,5 +1,6 @@
 package cn.cug.sxy.ai.api.vo;
 
+import cn.cug.sxy.ai.domain.rag.model.entity.Document;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -69,5 +70,31 @@ public class DocumentDetailVO {
      * 文档内容预览
      */
     private String contentPreview;
+
+    /**
+     * 将领域实体转换为VO
+     *
+     * @param document 领域实体
+     * @return VO
+     */
+    public static DocumentDetailVO convertToDocumentVO(Document document) {
+        DocumentDetailVO vo = new DocumentDetailVO();
+        vo.setId(document.getId());
+        vo.setTitle(document.getTitle());
+        vo.setSource(document.getSource());
+        vo.setDocumentType(document.getDocumentType());
+        vo.setStatus(document.getStatus());
+        vo.setVectorized(document.getVectorized());
+        vo.setCreateTime(document.getCreateTime());
+        vo.setUpdateTime(document.getUpdateTime());
+        vo.setMetadata(document.getMetadata());
+        vo.setErrorMessage(document.getErrorMessage());
+        String content = document.getContent();
+        if (content != null) {
+            vo.setContentPreview(content.length() > 200 ? content.substring(0, 200) + "..." : content);
+        }
+
+        return vo;
+    }
 
 }

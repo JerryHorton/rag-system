@@ -75,10 +75,20 @@
             <artifactId>pdfbox</artifactId>
             <version>3.0.4</version>
         </dependency>
+        <dependency>
+            <groupId>org.apache.pdfbox</groupId>
+            <artifactId>pdfbox-io</artifactId>
+            <version>3.0.4</version>
+        </dependency>
 
         <dependency>
             <groupId>org.apache.poi</groupId>
             <artifactId>poi-ooxml</artifactId>
+            <version>5.4.0</version>
+        </dependency>
+        <dependency>
+            <groupId>org.apache.poi</groupId>
+            <artifactId>poi-scratchpad</artifactId>
             <version>5.4.0</version>
         </dependency>
 
@@ -111,7 +121,7 @@
         <dependency>
             <groupId>commons-io</groupId>
             <artifactId>commons-io</artifactId>
-            <version>2.15.1</version>
+            <version>2.16.1</version>
         </dependency>
 
         <!-- 测试依赖 -->

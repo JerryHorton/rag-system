@@ -1,7 +1,7 @@
 package cn.cug.sxy.ai.infrastructure.repository;
 
-import cn.cug.sxy.ai.domain.document.model.entity.DocumentChunk;
-import cn.cug.sxy.ai.domain.document.repository.IDocumentChunkRepository;
+import cn.cug.sxy.ai.domain.rag.model.entity.DocumentChunk;
+import cn.cug.sxy.ai.domain.rag.repository.IDocumentChunkRepository;
 import cn.cug.sxy.ai.infrastructure.dao.IDocumentChunkDao;
 import cn.cug.sxy.ai.infrastructure.dao.converter.DocumentChunkConverter;
 import cn.cug.sxy.ai.infrastructure.dao.po.DocumentChunkPO;

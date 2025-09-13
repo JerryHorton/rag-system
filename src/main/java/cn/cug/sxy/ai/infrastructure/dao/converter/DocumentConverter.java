@@ -1,6 +1,6 @@
 package cn.cug.sxy.ai.infrastructure.dao.converter;
 
-import cn.cug.sxy.ai.domain.document.model.entity.Document;
+import cn.cug.sxy.ai.domain.rag.model.entity.Document;
 import cn.cug.sxy.ai.infrastructure.dao.po.DocumentPO;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.type.TypeReference;

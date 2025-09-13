@@ -374,6 +374,33 @@
                         <div class="form-text">用于生成回答的语言模型</div>
                     </div>
                     
+                    <div class="mb-3">
+                        <label for="routerSelect" class="form-label">路由策略</label>
+                        <select class="form-select" id="routerSelect">
+                            <option value="SEMANTIC">语义</option>
+                            <option value="RULE_BASED">规则</option>
+                        </select>
+                        <div class="form-text">选择用于查询的路由器</div>
+                    </div>
+                    
+                    <div class="mb-3 form-check">
+                        <input type="checkbox" class="form-check-input" id="hydeCheck">
+                        <label class="form-check-label" for="hydeCheck">启用HyDE</label>
+                        <div class="form-text">生成假设性答案以改进召回</div>
+                    </div>
+                    
+                    <div class="mb-3 form-check">
+                        <input type="checkbox" class="form-check-input" id="stepBackCheck">
+                        <label class="form-check-label" for="stepBackCheck">启用Step-Back</label>
+                        <div class="form-text">对复杂问题先抽象再回溯</div>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="indexNameInput" class="form-label">索引名称</label>
+                        <input type="text" class="form-control" id="indexNameInput" placeholder="可选，如：default_index">
+                        <div class="form-text">限定向量索引（可选）</div>
+                    </div>
+                    
                     <button type="submit" class="btn btn-primary">保存设置</button>
                 </form>
             </div>
@@ -530,14 +557,20 @@
                         // 调用API
                         const advancedRag = document.getElementById('advancedRagSwitch').checked;
                         
-                        const params = {
-                            topK: parseInt(document.getElementById('topKInput').value || '5'),
-                            similarityThreshold: parseFloat(document.getElementById('similarityThresholdInput').value || '0.7'),
-                            rerankerEnabled: document.getElementById('rerankerCheck').checked,
-                            multiQueryEnabled: advancedRag && document.getElementById('multiQueryCheck').checked,
-                            selfCorrectionEnabled: advancedRag && document.getElementById('selfCorrectionCheck').checked,
-                            model: document.getElementById('modelSelect').value
-                        };
+                                                    const params = {
+                                topK: parseInt(document.getElementById('topKInput').value || '5'),
+                                limit: parseInt(document.getElementById('topKInput').value || '5'),
+                                minScore: parseFloat(document.getElementById('similarityThresholdInput').value || '0.7'),
+                                similarityThreshold: parseFloat(document.getElementById('similarityThresholdInput').value || '0.7'),
+                                rerankerEnabled: document.getElementById('rerankerCheck').checked,
+                                multiQueryEnabled: advancedRag && document.getElementById('multiQueryCheck').checked,
+                                selfRagEnabled: advancedRag && document.getElementById('selfCorrectionCheck').checked,
+                                hydeEnabled: document.getElementById('hydeCheck').checked,
+                                stepBackEnabled: document.getElementById('stepBackCheck').checked,
+                                indexName: document.getElementById('indexNameInput').value,
+                                router: document.getElementById('routerSelect').value,
+                                model: document.getElementById('modelSelect').value
+                            };
                         
                         // 直接使用fetch进行查询，确保请求能发出
                         const requestData = {
@@ -1393,7 +1426,63 @@
                                             metricsHtml += '</ul>';
                                             responseDiv.innerHTML += metricsHtml;
                                         }
+
+                                        // 来源证据渲染
+                                        if (response.sources && response.sources.length) {
+                                            let sourcesHtml = '<div class="mt-3"><p><strong>来源证据:</strong></p>';
+                                            sourcesHtml += '<div class="row row-cols-1 row-cols-md-2 g-3">';
+                                            response.sources.forEach((src, idx) => {
+                                                const scoreBadge = formatScoreBadge(src.score);
+                                                const title = src.title ? src.title : (src.source ? src.source : `来源${idx + 1}`);
+                                                const snippet = src.snippet ? src.snippet : '';
+                                                const docId = src.id || src.documentId;
+                                                const start = src.startPosition != null ? src.startPosition : '';
+                                                const end = src.endPosition != null ? src.endPosition : '';
+                                                const safeSnippet = snippet.replace(/</g, '&lt;').replace(/>/g, '&gt;');
+                                                sourcesHtml += `
+                                                    <div class="col">
+                                                      <div class="card h-100 shadow-sm">
+                                                        <div class="card-body">
+                                                          <div class="d-flex justify-content-between align-items-start">
+                                                            <h6 class="card-title mb-2" title="${title}">${title}</h6>
+                                                            ${scoreBadge}
+                                                          </div>
+                                                          <p class="card-text small text-muted mb-2" title="${src.source || ''}">${src.source || ''}</p>
+                                                          <div class="card-text" style="max-height: 120px; overflow:auto;">
+                                                            <span class="text-body">${safeSnippet}</span>
+                                                          </div>
+                                                        </div>
+                                                        <div class="card-footer bg-white border-0 pt-0 pb-3">
+                                                          <div class="d-flex gap-2">
+                                                            <button class="btn btn-sm btn-outline-primary" data-action="locate" data-doc-id="${docId || ''}" data-start="${start}" data-end="${end}" data-title="${title}">定位到原文</button>
+                                                            <button class="btn btn-sm btn-outline-secondary" data-action="copy" data-text="${safeSnippet}">复制片段</button>
+                                                          </div>
+                                                        </div>
+                                                      </div>
+                                                    </div>`;
+                                            });
+                                            sourcesHtml += '</div></div>';
+                                            responseDiv.innerHTML += sourcesHtml;
+                                        }
                                         
+                                        // 为本响应块内的按钮添加事件
+                                        responseDiv.querySelectorAll('button[data-action="locate"]').forEach(btn => {
+                                            btn.addEventListener('click', function() {
+                                                const docId = this.getAttribute('data-doc-id');
+                                                const start = parseInt(this.getAttribute('data-start'));
+                                                const end = parseInt(this.getAttribute('data-end'));
+                                                const title = this.getAttribute('data-title') || '';
+                                                if (!docId) { alert('缺少文档ID，无法定位'); return; }
+                                                openSourceInDocument(docId, start, end, title);
+                                            });
+                                        });
+                                        responseDiv.querySelectorAll('button[data-action="copy"]').forEach(btn => {
+                                            btn.addEventListener('click', function() {
+                                                const text = this.getAttribute('data-text') || '';
+                                                copyToClipboard(text);
+                                            });
+                                        });
+                                         
                                         modalBody.appendChild(responseDiv);
                                     });
                                 } else {
@@ -1443,7 +1532,11 @@
                             rerankerEnabled: document.getElementById('rerankerCheck').checked,
                             multiQueryEnabled: document.getElementById('multiQueryCheck').checked,
                             selfCorrectionEnabled: document.getElementById('selfCorrectionCheck').checked,
-                            model: document.getElementById('modelSelect').value
+                            model: document.getElementById('modelSelect').value,
+                            router: document.getElementById('routerSelect').value,
+                            hydeEnabled: document.getElementById('hydeCheck').checked,
+                            stepBackEnabled: document.getElementById('stepBackCheck').checked,
+                            indexName: document.getElementById('indexNameInput').value
                         };
                         
                         debugLog(`保存用户设置: ${JSON.stringify(settings)}`);
@@ -1518,8 +1611,23 @@
                                     document.getElementById('selfCorrectionCheck').checked = settings.selfCorrectionEnabled;
                                 }
                                 
+                                if (settings.hydeEnabled !== undefined) {
+                                    document.getElementById('hydeCheck').checked = settings.hydeEnabled;
+                                }
+                                
+                                if (settings.stepBackEnabled !== undefined) {
+                                    document.getElementById('stepBackCheck').checked = settings.stepBackEnabled;
+                                }
+                                
+                                if (settings.indexName) {
+                                    document.getElementById('indexNameInput').value = settings.indexName;
+                                }
+                                
                                 if (settings.model) {
                                     document.getElementById('modelSelect').value = settings.model;
+                                }
+                                if (settings.router) {
+                                    document.getElementById('routerSelect').value = settings.router;
                                 }
                             })
                             .catch(error => {

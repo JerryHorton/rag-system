@@ -1,0 +1,118 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="cn.cug.sxy.ai.infrastructure.dao.IResponseDao">
+
+    <!-- 结果映射 -->
+    <resultMap id="ResponseResultMap" type="cn.cug.sxy.ai.infrastructure.dao.po.ResponsePO">
+        <id column="id" property="id"/>
+        <result column="query_id" property="queryId"/>
+        <result column="session_id" property="sessionId"/>
+        <result column="answer_text" property="answerText"/>
+        <result column="retrieved_context" property="retrievedContext"/>
+        <result column="context_sources" property="contextSources"/>
+        <result column="status" property="status"/>
+        <result column="create_time" property="createTime"/>
+        <result column="complete_time" property="completeTime"/>
+        <result column="latency_ms" property="latencyMs"/>
+        <result column="model_name" property="modelName"/>
+        <result column="generation_params" property="generationParams"/>
+        <result column="evaluation_metrics" property="evaluationMetrics"/>
+        <result column="faithfulness_score" property="faithfulnessScore"/>
+        <result column="relevance_score" property="relevanceScore"/>
+        <result column="error_message" property="errorMessage"/>
+        <result column="need_review" property="needReview"/>
+        <result column="metadata" property="metadata" jdbcType="OTHER"/>
+        <result column="corrected_answer_text" property="correctedAnswerText"/>
+        <result column="response_type" property="responseType"/>
+    </resultMap>
+
+    <!-- 插入新响应 -->
+    <insert id="insert" useGeneratedKeys="true" keyProperty="id">
+        INSERT INTO t_response (
+            query_id, session_id, answer_text, retrieved_context, context_sources,
+            status, create_time, complete_time, latency_ms, model_name,
+            generation_params, evaluation_metrics, faithfulness_score, relevance_score,
+            error_message, need_review, metadata, corrected_answer_text, response_type
+        ) VALUES (
+                     #{queryId}, #{sessionId}, #{answerText}, #{retrievedContext}, #{contextSources},
+                     #{status}, #{createTime}, #{completeTime}, #{latencyMs}, #{modelName},
+                     #{generationParams}, #{evaluationMetrics}, #{faithfulnessScore}, #{relevanceScore},
+                     #{errorMessage}, #{needReview}, #{metadata,jdbcType=OTHER}, #{correctedAnswerText}, #{responseType}
+                 )
+    </insert>
+
+    <!-- 通过ID查询响应 -->
+    <select id="selectById" resultMap="ResponseResultMap">
+        SELECT * FROM t_response WHERE id = #{id}
+    </select>
+
+    <!-- 查询指定查询ID的所有响应 -->
+    <select id="selectByQueryId" resultMap="ResponseResultMap">
+        SELECT * FROM t_response WHERE query_id = #{queryId} ORDER BY create_time DESC
+    </select>
+
+    <!-- 通过会话ID查询响应 -->
+    <select id="selectBySessionId" resultMap="ResponseResultMap">
+        SELECT * FROM t_response
+        WHERE session_id = #{sessionId}
+        ORDER BY create_time DESC
+        LIMIT #{limit}
+    </select>
+
+    <!-- 更新响应 -->
+    <update id="updateById">
+        UPDATE t_response
+        <set>
+            <if test="status != null">status = #{status},</if>
+            <if test="completeTime != null">complete_time = #{completeTime},</if>
+            <if test="latencyMs != null">latency_ms = #{latencyMs},</if>
+            <if test="answerText != null">answer_text = #{answerText},</if>
+            <if test="retrievedContext != null">retrieved_context = #{retrievedContext},</if>
+            <if test="contextSources != null">context_sources = #{contextSources},</if>
+            <if test="modelName != null">model_name = #{modelName},</if>
+            <if test="generationParams != null">generation_params = #{generationParams},</if>
+            <if test="evaluationMetrics != null">evaluation_metrics = #{evaluationMetrics},</if>
+            <if test="faithfulnessScore != null">faithfulness_score = #{faithfulnessScore},</if>
+            <if test="relevanceScore != null">relevance_score = #{relevanceScore},</if>
+            <if test="errorMessage != null">error_message = #{errorMessage},</if>
+            <if test="needReview != null">need_review = #{needReview},</if>
+            <if test="metadata != null">metadata = #{metadata,jdbcType=OTHER},</if>
+            <if test="correctedAnswerText != null">corrected_answer_text = #{correctedAnswerText},</if>
+            <if test="responseType != null">response_type = #{responseType},</if>
+        </set>
+        WHERE id = #{id}
+    </update>
+
+    <!-- 删除响应 -->
+    <delete id="deleteById">
+        DELETE FROM t_response WHERE id = #{id}
+    </delete>
+
+    <!-- 查询指定查询ID的响应数量 -->
+    <select id="countByQueryId" resultType="int">
+        SELECT COUNT(*) FROM t_response WHERE query_id = #{queryId}
+    </select>
+
+    <!-- 查询指定文档的源内容片段 -->
+    <select id="selectSourceChunksByDocumentId" resultType="java.util.Map">
+        SELECT
+            c.id AS chunk_id,
+            c.document_id,
+            c.content AS chunk_content,
+            c.chunk_index,
+            c.start_position AS start_position,
+            c.end_position AS end_position,
+            c.metadata AS chunk_metadata,
+            d.title AS document_title,
+            d.source AS document_source
+        FROM
+            t_document_chunk c
+                JOIN
+            t_document d ON c.document_id = d.id
+        WHERE
+            c.document_id = #{documentId}
+        ORDER BY
+            c.chunk_index ASC
+    </select>
+
+</mapper>

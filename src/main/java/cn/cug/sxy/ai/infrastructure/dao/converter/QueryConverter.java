@@ -1,6 +1,7 @@
 package cn.cug.sxy.ai.infrastructure.dao.converter;
 
-import cn.cug.sxy.ai.domain.document.model.entity.Query;
+import cn.cug.sxy.ai.domain.rag.model.entity.Query;
+import cn.cug.sxy.ai.domain.rag.model.valobj.QueryParams;
 import cn.cug.sxy.ai.infrastructure.dao.po.QueryPO;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.type.TypeReference;
@@ -9,9 +10,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
 import java.util.Collections;
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
 import java.util.stream.Collectors;
 
 /**
@@ -41,7 +40,6 @@ public class QueryConverter {
         if (entity == null) {
             return null;
         }
-
         String metadataJson = null;
         if (entity.getMetadata() != null) {
             try {
@@ -64,7 +62,7 @@ public class QueryConverter {
                 .createTime(entity.getCreateTime())
                 .completeTime(entity.getCompleteTime())
                 .latencyMs(entity.getLatencyMs())
-                .metadataJson(metadataJson)
+                .metadata(metadataJson)
                 .queryVariants(entity.getQueryVariants())
                 .decomposedQueries(entity.getDecomposedQueries())
                 .responseIds(entity.getResponseIds())
@@ -84,11 +82,11 @@ public class QueryConverter {
             return null;
         }
 
-        Map<String, Object> metadata = new HashMap<>();
-        if (po.getMetadataJson() != null && !po.getMetadataJson().isEmpty()) {
+        QueryParams metadata = new QueryParams();
+        if (po.getMetadata() != null && !po.getMetadata().isEmpty()) {
             try {
-                metadata = objectMapper.readValue(po.getMetadataJson(),
-                        new TypeReference<Map<String, Object>>() {
+                metadata = objectMapper.readValue(po.getMetadata(),
+                        new TypeReference<>() {
                         });
             } catch (JsonProcessingException e) {
                 log.error("将JSON转换为查询元数据时出错", e);

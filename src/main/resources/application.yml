@@ -19,16 +19,14 @@ spring:
     openai:
       api-key: ${OPENAI_API_KEY:sk-375014f0a89f4e3ebb9cc22ef791cd90}
       base-url: ${OPENAI_BASE_URL:https://dashscope.aliyuncs.com/compatible-mode}
-      chat:
-        options:
-          model: qwen-plus-2025-07-14
-          temperature: 0.7
-          top-p: 1.0
-          max-tokens: 2000
+      model: qwen-plus-2025-07-14
       embedding:
         options:
           model: text-embedding-v4
           dimensions: 1536
+    chat:
+      client:
+        enabled: false
   servlet:
     multipart:
       max-file-size: 10MB
@@ -83,13 +81,14 @@ rag:
   
   # 检索配置
   retrieval:
-    default-limit: 5
+    default-top-k: 5
     default-min-score: 0.7
     reranker-enabled: true
-    default-index: default_index
+    default-index: default
   
   # 路由配置
   routing:
+    default-router-type: RULE_BASED
     default-query-type: BASIC
     use-semantic-router: true
     semantic:

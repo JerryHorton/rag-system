@@ -1,10 +1,10 @@
 package cn.cug.sxy.ai.infrastructure.repository;
 
-import cn.cug.sxy.ai.domain.document.repository.IDocumentRepository;
+import cn.cug.sxy.ai.domain.rag.repository.IDocumentRepository;
 import cn.cug.sxy.ai.infrastructure.dao.IDocumentDao;
 import cn.cug.sxy.ai.infrastructure.dao.converter.DocumentConverter;
 import cn.cug.sxy.ai.infrastructure.dao.po.DocumentPO;
-import cn.cug.sxy.ai.domain.document.model.entity.Document;
+import cn.cug.sxy.ai.domain.rag.model.entity.Document;
 import com.github.pagehelper.Page;
 import com.github.pagehelper.PageHelper;
 import org.springframework.stereotype.Repository;

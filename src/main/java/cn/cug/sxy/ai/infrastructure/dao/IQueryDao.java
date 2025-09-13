@@ -1,6 +1,7 @@
 package cn.cug.sxy.ai.infrastructure.dao;
 
 import cn.cug.sxy.ai.infrastructure.dao.po.QueryPO;
+import org.apache.ibatis.annotations.MapKey;
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
 
@@ -124,6 +125,7 @@ public interface IQueryDao {
      * @param endTime 结束时间
      * @return 状态及对应的查询数量
      */
+    @MapKey("status")
     List<Map<String, Object>> countByStatus(@Param("startTime") LocalDateTime startTime,
                                             @Param("endTime") LocalDateTime endTime);
 
@@ -134,6 +136,7 @@ public interface IQueryDao {
      * @param endTime 结束时间
      * @return 查询类型及对应的查询数量
      */
+    @MapKey("query_type")
     List<Map<String, Object>> countByQueryType(@Param("startTime") LocalDateTime startTime,
                                                @Param("endTime") LocalDateTime endTime);
 

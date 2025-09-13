@@ -67,7 +67,7 @@ public class QueryPO {
     /**
      * 查询元数据JSON
      */
-    private String metadataJson;
+    private String metadata;
     /**
      * 查询变体JSON
      */

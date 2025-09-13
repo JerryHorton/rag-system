@@ -1,9 +1,9 @@
 package cn.cug.sxy.ai.infrastructure.dao.converter;
 
-import cn.cug.sxy.ai.domain.document.model.entity.Vector;
-import cn.cug.sxy.ai.domain.document.model.valobj.SpaceType;
-import cn.cug.sxy.ai.domain.document.model.valobj.VectorCategory;
-import cn.cug.sxy.ai.domain.document.model.valobj.VectorType;
+import cn.cug.sxy.ai.domain.rag.model.entity.Vector;
+import cn.cug.sxy.ai.domain.rag.model.valobj.SpaceType;
+import cn.cug.sxy.ai.domain.rag.model.valobj.VectorCategory;
+import cn.cug.sxy.ai.domain.rag.model.valobj.VectorType;
 import cn.cug.sxy.ai.infrastructure.dao.po.VectorPO;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.type.TypeReference;

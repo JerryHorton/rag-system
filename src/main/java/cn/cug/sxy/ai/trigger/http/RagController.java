@@ -1,23 +1,24 @@
 package cn.cug.sxy.ai.trigger.http;
 
 import cn.cug.sxy.ai.api.IRagService;
+import cn.cug.sxy.ai.api.dto.QueryRequestDTO;
 import cn.cug.sxy.ai.api.vo.DocumentDetailVO;
-import cn.cug.sxy.ai.domain.document.model.entity.Document;
-import cn.cug.sxy.ai.domain.document.service.indexing.DocumentProcessingService;
-import cn.cug.sxy.ai.trigger.http.converter.ToVOConverter;
+import cn.cug.sxy.ai.api.vo.ResponseVO;
+import cn.cug.sxy.ai.domain.rag.model.valobj.QueryParams;
+import cn.cug.sxy.ai.domain.rag.service.IRagOrchestrationService;
+import cn.cug.sxy.ai.domain.rag.model.entity.Document;
+import cn.cug.sxy.ai.domain.rag.model.entity.Response;
+import cn.cug.sxy.ai.domain.rag.service.IDocumentService;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RequestMethod;
-import org.springframework.web.bind.annotation.RequestParam;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
-import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.UUID;
 
 /**
  * @version 1.0
@@ -31,10 +32,14 @@ import java.nio.file.Path;
 @RequestMapping("/api/rag")
 public class RagController implements IRagService {
 
-    private final DocumentProcessingService documentService;
+    private final IDocumentService documentService;
+    private final IRagOrchestrationService ragService;
 
-    public RagController(DocumentProcessingService documentService) {
+    public RagController(
+            IDocumentService documentService,
+            IRagOrchestrationService ragService) {
         this.documentService = documentService;
+        this.ragService = ragService;
     }
 
     @RequestMapping(value = "/documents/upload", method = RequestMethod.POST, consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
@@ -55,9 +60,41 @@ public class RagController implements IRagService {
             // 删除临时文件
             Files.deleteIfExists(tempFile);
 
-            return ResponseEntity.status(HttpStatus.CREATED).body(ToVOConverter.convertToDocumentVO(document));
-        } catch (IOException e) {
+            return ResponseEntity.status(HttpStatus.CREATED).body(DocumentDetailVO.convertToDocumentVO(document));
+        } catch (Exception e) {
             log.error("文件处理失败: {}", e.getMessage(), e);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
+        }
+    }
+
+    @RequestMapping(value = "/query", method = RequestMethod.POST)
+    @Override
+    public ResponseEntity<ResponseVO> queryDocument(@RequestBody QueryRequestDTO requestDTO) {
+        log.info("收到查询请求: {}", requestDTO.getQuery());
+        QueryRequestDTO.ExtraParams extraParams = requestDTO.getParams();
+        String sessionId = requestDTO.getSessionId();
+        if (sessionId == null || sessionId.isEmpty()) {
+            sessionId = UUID.randomUUID().toString();
+        }
+        try {
+            Response response = ragService.processQuery(
+                    requestDTO.getQuery(),
+                    requestDTO.getUserId(),
+                    sessionId,
+                    QueryParams.builder()
+                            .topK(extraParams.getTopK())
+                            .minScore(extraParams.getMinScore())
+                            .router(extraParams.getRouter())
+                            .indexName(extraParams.getIndexName())
+                            .similarityThreshold(extraParams.getSimilarityThreshold())
+                            .build()
+            );
+            ResponseVO responseVO = ResponseVO.convertToResponseVO(response);
+
+            return ResponseEntity.ok(responseVO);
+        } catch (Exception e) {
+            log.error("查询处理失败: {}", e.getMessage(), e);
+
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
         }
     }
