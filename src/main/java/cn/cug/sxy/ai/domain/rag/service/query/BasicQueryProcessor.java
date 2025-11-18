@@ -45,6 +45,25 @@ public class BasicQueryProcessor implements IQueryProcessor {
     @Value("${rag.retrieval.default-index:default}")
     private String defaultIndexName;
 
+    @Value("${rag.retrieval.default-limit:5}")
+    private Integer defaultLimit;
+
+    @Value("${rag.retrieval.default-max-contexts:6}")
+    private Integer defaultMaxContexts;
+
+    @Value("${rag.retrieval.default-per-doc-max-chunks:2}")
+    private Integer defaultPerDocMaxChunks;
+
+    @Value("${rag.retrieval.default-neighbor-window:1}")
+    private Integer defaultNeighborWindow;
+
+    @Value("${rag.retrieval.default-candidate-multiplier:4}")
+    private Integer defaultCandidateMultiplier;
+
+    @Value("${rag.retrieval.default-doc-agg:MEAN_TOP2}")
+    private String defaultDocAgg;
+
+
     private final IEmbeddingService embeddingService;
     private final IRetriever retriever;
     private final IGenerator generator;
@@ -98,10 +117,17 @@ public class BasicQueryProcessor implements IQueryProcessor {
             query.setVector(queryEmbedding);
             // 2.1. 检索相关上下文 设置检索参数
             log.info("检索相关上下文 queryId={}", query.getId());
-            RetrievalParams retrievalParams = new RetrievalParams();
-            retrievalParams.setTopK(query.getMetadata().getTopK() != null ? query.getMetadata().getTopK() : defaultTopK);
-            retrievalParams.setMinScore(query.getMetadata().getMinScore() != null ? query.getMetadata().getMinScore() : defaultMinScore);
-            retrievalParams.setIndexName(query.getMetadata().getIndexName() != null ? query.getMetadata().getIndexName() : defaultIndexName);
+            RetrievalParams retrievalParams = RetrievalParams.builder()
+                    .topK(query.getMetadata().getTopK() != null ? query.getMetadata().getTopK() : defaultTopK)
+                    .minScore(query.getMetadata().getMinScore() != null ? query.getMetadata().getMinScore() : defaultMinScore)
+                    .indexName(query.getMetadata().getIndexName() != null ? query.getMetadata().getIndexName() : defaultIndexName)
+                    .limit(defaultLimit)
+                    .candidateMultiplier(defaultCandidateMultiplier)
+                    .docAgg(defaultDocAgg)
+                    .neighborWindow(defaultNeighborWindow)
+                    .perDocMaxChunks(defaultPerDocMaxChunks)
+                    .maxContexts(defaultMaxContexts)
+                    .build();
             List<Map<String, Object>> retrievedContexts = retriever.retrieve(query, retrievalParams);
             // 2.2. 提取上下文文本和来源
             List<String> contextTexts = new ArrayList<>();

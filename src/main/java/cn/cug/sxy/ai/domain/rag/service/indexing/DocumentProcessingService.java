@@ -35,10 +35,10 @@ public class DocumentProcessingService {
     private final TextSplitterService textSplitterService;
     private final ApplicationEventPublisher eventPublisher;
 
-    @Value("${rag.document.chunk-size:5000}")
+    @Value("${rag.chunking.default-chunk-size:1000}")
     private int defaultChunkSize;
 
-    @Value("${rag.document.chunk-overlap:400}")
+    @Value("${rag.chunking.default-chunk-overlap:200}")
     private int defaultChunkOverlap;
 
     /**
