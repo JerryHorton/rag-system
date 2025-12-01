@@ -461,6 +461,44 @@
             return false;
         };
 
+        async function safeExtractPayload(response) {
+            try {
+                const text = await response.text();
+                if (!text) {
+                    return null;
+                }
+                return JSON.parse(text);
+            } catch (err) {
+                debugLog(`解析响应JSON失败: ${err.message}`);
+                return null;
+            }
+        }
+
+        function unwrapApiResponse(payload) {
+            if (payload && typeof payload === 'object' && Object.prototype.hasOwnProperty.call(payload, 'success')) {
+                return {
+                    success: payload.success !== false,
+                    message: payload.message,
+                    data: payload.data
+                };
+            }
+            return { success: true, data: payload, message: '' };
+        }
+
+        async function handleApiResponse(response, defaultErrorMessage = '请求失败') {
+            const payload = await safeExtractPayload(response);
+            const errorMessage = defaultErrorMessage || '请求失败';
+            if (!response.ok) {
+                const msg = payload && payload.message ? payload.message : `${errorMessage} (HTTP ${response.status})`;
+                throw new Error(msg);
+            }
+            const unwrapped = unwrapApiResponse(payload);
+            if (!unwrapped.success) {
+                throw new Error(unwrapped.message || errorMessage);
+            }
+            return unwrapped;
+        }
+
         // 页面加载完成后初始化
         document.addEventListener('DOMContentLoaded', function() {
             debugLog('DOM加载完成，初始化开始');
@@ -591,18 +629,15 @@
                         })
                         .then(response => {
                             debugLog(`查询响应状态: ${response.status}`);
-                            if (!response.ok) {
-                                throw new Error(`API错误: ${response.status}`);
-                            }
-                            return response.json();
+                            return handleApiResponse(response, '查询请求失败');
                         })
-                        .then(data => {
+                        .then(({ data, message }) => {
                             debugLog(`查询响应数据: ${JSON.stringify(data)}`);
                             // 隐藏进度指示器
                             progressIndicator.style.display = 'none';
                             
                             // 添加系统回复
-                            addResponse(data);
+                            addResponse(data || { answer: message || '暂无可用结果', status: 'EMPTY' });
                         })
                         .catch(error => {
                             debugLog(`查询错误: ${error.message}`);
@@ -745,12 +780,10 @@
                         fetch(`${API_BASE_URL}/api/rag/documents/${source.id}/sources`)
                             .then(response => {
                                 debugLog(`来源信息响应状态: ${response.status}`);
-                                if (!response.ok) {
-                                    throw new Error(`获取文档源信息失败: ${response.status}`);
-                                }
-                                return response.json();
+                                return handleApiResponse(response, '获取文档源信息失败');
                             })
-                            .then(sources => {
+                            .then(({ data }) => {
+                                const sources = Array.isArray(data) ? data : (data && data.sources ? data.sources : []);
                                 debugLog(`接收到${sources ? sources.length : 0}个来源信息`);
                                 modalBody.innerHTML = `
                                     <h5>${source.title}</h5>
@@ -1001,14 +1034,11 @@
                     })
                     .then(response => {
                         debugLog(`上传响应状态: ${response.status}`);
-                        if (!response.ok) {
-                            throw new Error(`文件上传失败: ${response.status}`);
-                        }
-                        return response.json();
+                        return handleApiResponse(response, '文件上传失败');
                     })
-                    .then(data => {
+                    .then(({ message }) => {
                         debugLog('文件上传成功');
-                        uploadStatus.innerHTML = '<div class="alert alert-success">文件上传成功!</div>';
+                        uploadStatus.innerHTML = `<div class="alert alert-success">${message || '文件上传成功!'}</div>`;
                         // 清空文件选择
                         fileInput.value = '';
                         updateFileList();
@@ -1055,14 +1085,9 @@
                         },
                         body: JSON.stringify(requestData)
                     })
-                    .then(response => {
-                        if (!response.ok) {
-                            throw new Error(`URL导入失败: ${response.status}`);
-                        }
-                        return response.json();
-                    })
-                    .then(data => {
-                        urlStatus.innerHTML = '<div class="alert alert-success">URL导入成功!</div>';
+                    .then(response => handleApiResponse(response, 'URL导入失败'))
+                    .then(({ message }) => {
+                        urlStatus.innerHTML = `<div class="alert alert-success">${message || 'URL导入成功!'}</div>`;
                         urlInput.value = '';
                         urlTitleInput.value = '';
                         loadDocuments();
@@ -1107,14 +1132,9 @@
                         },
                         body: JSON.stringify(requestData)
                     })
-                    .then(response => {
-                        if (!response.ok) {
-                            throw new Error(`文本提交失败: ${response.status}`);
-                        }
-                        return response.json();
-                    })
-                    .then(data => {
-                        textStatus.innerHTML = '<div class="alert alert-success">文本提交成功!</div>';
+                    .then(response => handleApiResponse(response, '文本提交失败'))
+                    .then(({ message }) => {
+                        textStatus.innerHTML = `<div class="alert alert-success">${message || '文本提交成功!'}</div>`;
                         textTitleInput.value = '';
                         textContentInput.value = '';
                         loadDocuments();
@@ -1146,18 +1166,23 @@
                         fetch(`${API_BASE_URL}/api/rag/documents?page=0&size=10`)
                             .then(response => {
                                 debugLog(`文档列表响应状态: ${response.status}`);
-                                if (!response.ok) {
-                                    throw new Error(`获取文档列表失败: ${response.status}`);
-                                }
-                                return response.json();
+                                return handleApiResponse(response, '获取文档列表失败');
                             })
-                            .then(data => {
-                                debugLog(`接收到${data.documents ? data.documents.length : 0}条文档`);
+                            .then(({ data }) => {
+                                let documents = [];
+                                if (data && Array.isArray(data.documents)) {
+                                    documents = data.documents;
+                                } else if (Array.isArray(data)) {
+                                    documents = data;
+                                } else if (data && Array.isArray(data.items)) {
+                                    documents = data.items;
+                                }
+                                debugLog(`接收到${documents.length}条文档`);
                                 // 清空表格
                                 tbody.innerHTML = '';
                                 
-                                if (data.documents && data.documents.length > 0) {
-                                    data.documents.forEach(doc => {
+                                if (documents.length > 0) {
+                                    documents.forEach(doc => {
                                         const row = tbody.insertRow();
                                         
                                         row.insertCell(0).textContent = doc.id;
@@ -1216,12 +1241,10 @@
                         fetch(`${API_BASE_URL}/api/rag/documents/${docId}`)
                             .then(response => {
                                 debugLog(`文档详情响应状态: ${response.status}`);
-                                if (!response.ok) {
-                                    throw new Error(`获取文档详情失败: ${response.status}`);
-                                }
-                                return response.json();
+                                return handleApiResponse(response, '获取文档详情失败');
                             })
-                            .then(doc => {
+                            .then(({ data }) => {
+                                const doc = data || {};
                                 debugLog(`接收到文档详情: ID=${doc.id}, 标题=${doc.title}`);
                                 const modalBody = document.getElementById('sourceModalBody');
                                 modalBody.innerHTML = `
@@ -1257,14 +1280,11 @@
                             })
                                 .then(response => {
                                     debugLog(`重新处理响应状态: ${response.status}`);
-                                    if (!response.ok) {
-                                        throw new Error(`重新处理文档失败: ${response.status}`);
-                                    }
-                                    return response.json();
+                                    return handleApiResponse(response, '重新处理文档失败');
                                 })
-                                .then(data => {
+                                .then(({ message }) => {
                                     debugLog('文档重新处理已启动');
-                                    alert('文档重新处理已启动');
+                                    alert(message || '文档重新处理已启动');
                                     loadDocuments();
                                 })
                                 .catch(error => {
@@ -1288,19 +1308,12 @@
                             })
                                 .then(response => {
                                     debugLog(`删除响应状态: ${response.status}`);
-                                    if (!response.ok) {
-                                        throw new Error(`删除文档失败: ${response.status}`);
-                                    }
-                                    return response.json();
+                                    return handleApiResponse(response, '删除文档失败');
                                 })
-                                .then(data => {
-                                    if (data.success) {
+                                .then(({ message }) => {
                                         debugLog('文档删除成功');
-                                        alert('文档已成功删除');
+                                    alert(message || '文档已成功删除');
                                         loadDocuments();
-                                    } else {
-                                        throw new Error('删除失败');
-                                    }
                                 })
                                 .catch(error => {
                                     debugLog(`删除错误: ${error.message}`);
@@ -1333,12 +1346,15 @@
                         fetch(`${API_BASE_URL}/api/rag/history/user/${DEFAULT_USER_ID}?limit=20`)
                             .then(response => {
                                 debugLog(`历史记录响应状态: ${response.status}`);
-                                if (!response.ok) {
-                                    throw new Error(`获取历史记录失败: ${response.status}`);
-                                }
-                                return response.json();
+                                return handleApiResponse(response, '获取历史记录失败');
                             })
-                            .then(queries => {
+                            .then(({ data }) => {
+                                let queries = [];
+                                if (Array.isArray(data)) {
+                                    queries = data;
+                                } else if (data && Array.isArray(data.records)) {
+                                    queries = data.records;
+                                }
                                 debugLog(`接收到${queries ? queries.length : 0}条历史记录`);
                                 // 清空表格
                                 tbody.innerHTML = '';
@@ -1397,12 +1413,10 @@
                         fetch(`${API_BASE_URL}/api/rag/responses/${queryId}`)
                             .then(response => {
                                 debugLog(`响应列表状态: ${response.status}`);
-                                if (!response.ok) {
-                                    throw new Error(`获取响应失败: ${response.status}`);
-                                }
-                                return response.json();
+                                return handleApiResponse(response, '获取响应失败');
                             })
-                            .then(responses => {
+                            .then(({ data }) => {
+                                const responses = Array.isArray(data) ? data : (data && Array.isArray(data.items) ? data.items : []);
                                 debugLog(`接收到${responses ? responses.length : 0}个响应`);
                                 const modalBody = document.getElementById('sourceModalBody');
                                 modalBody.innerHTML = '<h5>查询响应</h5>';
@@ -1550,14 +1564,11 @@
                         })
                             .then(response => {
                                 debugLog(`设置保存响应状态: ${response.status}`);
-                                if (!response.ok) {
-                                    throw new Error(`保存设置失败: ${response.status}`);
-                                }
-                                return response.json();
+                                return handleApiResponse(response, '保存设置失败');
                             })
-                            .then(data => {
+                            .then(({ message }) => {
                                 debugLog('设置保存成功');
-                                alert('设置已保存！');
+                                alert(message || '设置已保存！');
                             })
                             .catch(error => {
                                 debugLog(`设置保存错误: ${error.message}`);
@@ -1577,17 +1588,14 @@
                         fetch(`${API_BASE_URL}/api/rag/settings/${DEFAULT_USER_ID}`)
                             .then(response => {
                                 debugLog(`设置响应状态: ${response.status}`);
-                                if (!response.ok) {
-                                    // 如果没有设置，服务器会返回默认设置
                                     if (response.status === 404) {
                                         debugLog('用户没有保存的设置，使用默认设置');
-                                        return {};
+                                    return { data: {} };
                                     }
-                                    throw new Error(`获取设置失败: ${response.status}`);
-                                }
-                                return response.json();
+                                return handleApiResponse(response, '获取设置失败');
                             })
-                            .then(settings => {
+                            .then(({ data }) => {
+                                const settings = data || {};
                                 debugLog(`接收到用户设置: ${JSON.stringify(settings)}`);
                                 
                                 if (settings.topK) {

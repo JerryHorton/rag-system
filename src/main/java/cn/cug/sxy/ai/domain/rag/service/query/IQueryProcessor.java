@@ -21,6 +21,13 @@ public interface IQueryProcessor {
     Response processQuery(Query query);
 
     /**
+     * 带策略的处理。
+     */
+    default Response processQuery(Query query, cn.cug.sxy.ai.domain.rag.model.strategy.QueryStrategy strategy) {
+        return processQuery(query);
+    }
+
+    /**
      * 获取查询处理器类型
      *
      * @return 处理器类型

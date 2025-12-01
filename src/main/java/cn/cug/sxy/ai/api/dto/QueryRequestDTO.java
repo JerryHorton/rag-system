@@ -59,6 +59,26 @@ public class QueryRequestDTO {
          */
         private String indexName;
 
+        private Integer limit;
+
+        private Integer candidateMultiplier;
+
+        private Boolean rerankerEnabled;
+
+        private Boolean multiQueryEnabled;
+
+        private Boolean selfRagEnabled;
+
+        private Boolean hydeEnabled;
+
+        private Boolean stepBackEnabled;
+
+        private String model;
+
+        private Boolean clarify;
+
+        private String forceType;
+
     }
 
 }

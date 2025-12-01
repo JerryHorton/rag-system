@@ -53,4 +53,22 @@ public class AsyncConfig {
         return executor;
     }
 
+    @Bean(name = "taskExecutionExecutor")
+    public Executor taskExecutionExecutor(
+            @Value("${rag.async.task.core-pool-size:10}") int corePoolSize,
+            @Value("${rag.async.task.max-pool-size:20}") int maxPoolSize,
+            @Value("${rag.async.task.queue-capacity:100}") int queueCapacity,
+            @Value("${rag.async.task.keep-alive-seconds:60}") int keepAliveSeconds) {
+        ThreadPoolTaskExecutor executor = new ThreadPoolTaskExecutor();
+        executor.setCorePoolSize(corePoolSize);
+        executor.setMaxPoolSize(maxPoolSize);
+        executor.setQueueCapacity(queueCapacity);
+        executor.setKeepAliveSeconds(keepAliveSeconds);
+        executor.setThreadNamePrefix("task-executor-");
+        executor.setWaitForTasksToCompleteOnShutdown(true);
+        executor.setAwaitTerminationSeconds(30);
+        executor.initialize();
+        return executor;
+    }
+
 }

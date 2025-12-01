@@ -39,4 +39,27 @@ public class QueryParams {
      */
     private String indexName;
 
+    /**
+     * 额外限制
+     */
+    private Integer limit;
+
+    private Integer candidateMultiplier;
+
+    private Boolean rerankerEnabled;
+
+    private Boolean multiQueryEnabled;
+
+    private Boolean hydeEnabled;
+
+    private Boolean stepBackEnabled;
+
+    private Boolean selfRagEnabled;
+
+    private String model;
+
+    private Boolean clarify;
+
+    private String forceType;
+
 }

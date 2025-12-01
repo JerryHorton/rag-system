@@ -86,8 +86,8 @@ public class VectorSimilarityRetriever implements IRetriever {
                 .append("d.title, d.source, d.document_type AS type, ")
                 .append("1 - (v.embedding <=> ?::vector) AS similarity_score ")
                 .append("FROM t_vector v ")
-                .append("JOIN t_document_chunk c ON c.vector_id = v.id ")
-                .append("JOIN t_document d ON c.document_id = d.id ")
+                .append("JOIN document_chunk c ON c.vector_id = v.id ")
+                .append("JOIN document d ON c.document_id = d.id ")
                 .append("WHERE 1=1 ");
         boolean filterIndex = indexName != null && !indexName.isEmpty();
         if (filterIndex) {

@@ -1,0 +1,102 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="cn.cug.sxy.ai.infrastructure.dao.postgres.IIntentRuleDao">
+
+    <!-- 结果映射 -->
+    <resultMap id="BaseResultMap" type="cn.cug.sxy.ai.infrastructure.dao.po.IntentRulePO">
+        <id column="id" property="id"/>
+        <result column="rule_type" property="ruleType"/>
+        <result column="rule_content" property="ruleContent"/>
+        <result column="task_type" property="taskType"/>
+        <result column="topic_domain" property="topicDomain"/>
+        <result column="target_processor" property="targetProcessor"/>
+        <result column="confidence" property="confidence"/>
+        <result column="priority" property="priority"/>
+        <result column="is_active" property="isActive"/>
+        <result column="created_at" property="createdAt"/>
+        <result column="updated_at" property="updatedAt"/>
+    </resultMap>
+
+    <!-- 所有列 -->
+    <sql id="Base_Column_List">
+        id, rule_type, rule_content, task_type, topic_domain, target_processor, confidence, priority, is_active, created_at, updated_at
+    </sql>
+
+    <!-- 获取所有启用的规则 -->
+    <select id="selectAllActive" resultMap="BaseResultMap">
+        SELECT
+        <include refid="Base_Column_List"/>
+        FROM intent_rule
+        WHERE is_active = true
+        ORDER BY priority DESC, id ASC
+    </select>
+
+    <!-- 获取所有规则 -->
+    <select id="selectAll" resultMap="BaseResultMap">
+        SELECT
+        <include refid="Base_Column_List"/>
+        FROM intent_rule
+        ORDER BY priority DESC, id ASC
+    </select>
+
+    <!-- 根据ID查询 -->
+    <select id="selectById" parameterType="java.lang.Long" resultMap="BaseResultMap">
+        SELECT
+        <include refid="Base_Column_List"/>
+        FROM intent_rule
+        WHERE id = #{id}
+    </select>
+
+    <!-- 根据类型查询 -->
+    <select id="selectByType" parameterType="java.lang.String" resultMap="BaseResultMap">
+        SELECT
+        <include refid="Base_Column_List"/>
+        FROM intent_rule
+        WHERE rule_type = #{ruleType}
+        AND is_active = true
+        ORDER BY priority DESC, id ASC
+    </select>
+
+    <!-- 插入规则 -->
+    <insert id="insert" parameterType="cn.cug.sxy.ai.infrastructure.dao.po.IntentRulePO" useGeneratedKeys="true"
+            keyProperty="id">
+        INSERT INTO intent_rule (rule_type, rule_content, task_type, topic_domain, target_processor,
+                                 confidence, priority, is_active, created_at, updated_at)
+        VALUES (#{ruleType}, #{ruleContent}, #{taskType}, #{topicDomain}, #{targetProcessor},
+                #{confidence}, #{priority}, #{isActive}, NOW(), NOW())
+    </insert>
+
+    <!-- 更新规则 -->
+    <update id="updateById" parameterType="cn.cug.sxy.ai.infrastructure.dao.po.IntentRulePO">
+        UPDATE intent_rule
+        <set>
+            <if test="ruleType != null and ruleType != ''">rule_type = #{ruleType},</if>
+            <if test="ruleContent != null and ruleContent != ''">rule_content = #{ruleContent},</if>
+            <if test="taskType != null and taskType != ''">task_type = #{taskType},</if>
+            <if test="topicDomain != null and topicDomain != ''">topic_domain = #{topicDomain},</if>
+            <if test="targetProcessor != null and targetProcessor != ''">target_processor = #{targetProcessor},</if>
+            <if test="confidence != null">confidence = #{confidence},</if>
+            <if test="priority != null">priority = #{priority},</if>
+            <if test="isActive != null">is_active = #{isActive},</if>
+            updated_at = NOW()
+        </set>
+        WHERE id = #{id}
+    </update>
+
+    <!-- 删除规则 -->
+    <delete id="deleteById" parameterType="java.lang.Long">
+        DELETE
+        FROM intent_rule
+        WHERE id = #{id}
+    </delete>
+
+    <!-- 批量删除规则 -->
+    <delete id="batchDelete">
+        DELETE FROM intent_rule
+        WHERE id IN
+        <foreach collection="ids" item="id" open="(" separator="," close=")">
+            #{id}
+        </foreach>
+    </delete>
+
+</mapper>

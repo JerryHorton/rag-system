@@ -2,7 +2,7 @@ package cn.cug.sxy.ai.infrastructure.repository;
 
 import cn.cug.sxy.ai.domain.rag.model.entity.Vector;
 import cn.cug.sxy.ai.domain.rag.repository.IVectorRepository;
-import cn.cug.sxy.ai.infrastructure.dao.IVectorDao;
+import cn.cug.sxy.ai.infrastructure.dao.postgres.IVectorDao;
 import cn.cug.sxy.ai.infrastructure.dao.converter.VectorConverter;
 import cn.cug.sxy.ai.infrastructure.dao.po.VectorPO;
 import cn.cug.sxy.ai.infrastructure.repository.dto.NearestVectorRow;

@@ -98,8 +98,17 @@ public class BasicQueryProcessor implements IQueryProcessor {
     @Override
     @Transactional
     public Response processQuery(Query query) {
+        return processQuery(query, null);
+    }
+
+    @Override
+    @Transactional
+    public Response processQuery(Query query, cn.cug.sxy.ai.domain.rag.model.strategy.QueryStrategy strategy) {
         log.info("开始处理查询 queryId={}", query.getId());
         Instant start = Instant.now();
+        cn.cug.sxy.ai.domain.rag.model.strategy.QueryStrategy effectiveStrategy =
+                strategy == null ? cn.cug.sxy.ai.domain.rag.model.strategy.QueryStrategy.builder().build().ensureDefaults()
+                        : strategy.ensureDefaults();
         try {
             // 更新查询状态为处理中
             query.setStatus("PROCESSING");
@@ -117,17 +126,7 @@ public class BasicQueryProcessor implements IQueryProcessor {
             query.setVector(queryEmbedding);
             // 2.1. 检索相关上下文 设置检索参数
             log.info("检索相关上下文 queryId={}", query.getId());
-            RetrievalParams retrievalParams = RetrievalParams.builder()
-                    .topK(query.getMetadata().getTopK() != null ? query.getMetadata().getTopK() : defaultTopK)
-                    .minScore(query.getMetadata().getMinScore() != null ? query.getMetadata().getMinScore() : defaultMinScore)
-                    .indexName(query.getMetadata().getIndexName() != null ? query.getMetadata().getIndexName() : defaultIndexName)
-                    .limit(defaultLimit)
-                    .candidateMultiplier(defaultCandidateMultiplier)
-                    .docAgg(defaultDocAgg)
-                    .neighborWindow(defaultNeighborWindow)
-                    .perDocMaxChunks(defaultPerDocMaxChunks)
-                    .maxContexts(defaultMaxContexts)
-                    .build();
+            RetrievalParams retrievalParams = buildRetrievalParams(query, effectiveStrategy);
             List<Map<String, Object>> retrievedContexts = retriever.retrieve(query, retrievalParams);
             // 2.2. 提取上下文文本和来源
             List<String> contextTexts = new ArrayList<>();
@@ -157,9 +156,7 @@ public class BasicQueryProcessor implements IQueryProcessor {
             }
             // 3. 生成回答
             log.info("生成回答 queryId={}", query.getId());
-            GenerateParams generateParams = new GenerateParams();
-            generateParams.setTemperature(0.7);
-            generateParams.setMaxTokens(1024);
+            GenerateParams generateParams = buildGenerateParams(effectiveStrategy);
             String answer = generator.generate(query.getProcessedText(), contextTexts, generateParams);
             // 4. 更新响应
             response.setAnswerText(answer);
@@ -220,6 +217,52 @@ public class BasicQueryProcessor implements IQueryProcessor {
     @Override
     public QueryType getType() {
         return QueryType.BASIC;
+    }
+
+    private RetrievalParams buildRetrievalParams(Query query, cn.cug.sxy.ai.domain.rag.model.strategy.QueryStrategy strategy) {
+        cn.cug.sxy.ai.domain.rag.model.strategy.RetrievalStrategy plan = strategy.getRetrieval();
+        Integer topK = firstNonNull(plan.getTopK(), query.getMetadata() != null ? query.getMetadata().getTopK() : null, defaultTopK);
+        Double minScore = firstNonNull(plan.getMinScore(), query.getMetadata() != null ? query.getMetadata().getMinScore() : null, defaultMinScore);
+        String indexName = firstNonBlank(plan.getIndexName(), query.getMetadata() != null ? query.getMetadata().getIndexName() : null, defaultIndexName);
+        return RetrievalParams.builder()
+                .topK(topK)
+                .minScore(minScore)
+                .indexName(indexName)
+                .limit(firstNonNull(plan.getLimit(), defaultLimit))
+                .candidateMultiplier(firstNonNull(query.getMetadata() != null ? query.getMetadata().getCandidateMultiplier() : null, defaultCandidateMultiplier))
+                .docAgg(defaultDocAgg)
+                .neighborWindow(defaultNeighborWindow)
+                .perDocMaxChunks(defaultPerDocMaxChunks)
+                .maxContexts(defaultMaxContexts)
+                .build();
+    }
+
+    private GenerateParams buildGenerateParams(cn.cug.sxy.ai.domain.rag.model.strategy.QueryStrategy strategy) {
+        cn.cug.sxy.ai.domain.rag.model.strategy.GenerationStrategy plan = strategy.getGeneration();
+        GenerateParams params = new GenerateParams();
+        params.setMaxTokens(plan.getMaxTokens() != null ? plan.getMaxTokens() : 1024);
+        params.setTemperature(plan.getTemperature() != null ? plan.getTemperature() : 0.7);
+        params.setModel(plan.getModel());
+        return params;
+    }
+
+    @SafeVarargs
+    private final <T> T firstNonNull(T... values) {
+        for (T value : values) {
+            if (value != null) {
+                return value;
+            }
+        }
+        return null;
+    }
+
+    private String firstNonBlank(String... values) {
+        for (String value : values) {
+            if (value != null && !value.isBlank()) {
+                return value;
+            }
+        }
+        return null;
     }
 
 }

@@ -1,21 +1,83 @@
 # 企业级RAG系统配置文件
 # 包含服务器、数据库、缓存、AI模型以及各种组件的配置
+# 服务器配置
+server:
+  port: 8091
+  tomcat:
+    threads:
+      max: 500        # 设定处理客户请求的线程的最大数目，决定了服务器可以同时响应客户请求的数,默认200
+      min-spare: 50   # 初始化线程数,最小空闲线程数,默认是10
+    accept-count: 10  # 等待队列长度
+
+# 线程池配置
+thread:
+  pool:
+    executor:
+      config:
+        core-pool-size: 20
+        max-pool-size: 50
+        keep-alive-time: 5000
+        block-queue-size: 5000
+        policy: CallerRunsPolicy
 
 spring:
+  # Redis配置
+  data:
+    redis:
+      host: ${REDIS_HOST:192.168.2.219}
+      port: ${REDIS_PORT:6380}
+      username: ${REDIS_USERNAME:default}
+      password: ${REDIS_PASSWORD:yourpassword123}
+      database: ${REDIS_DATABASE:0}
+      timeout: 3000ms
+      lettuce:
+        pool:
+          max-active: 20
+          max-idle: 10
+          min-idle: 5
+          max-wait: 3000ms
+  
+  # 缓存配置
+  cache:
+    type: ${CACHE_TYPE:redis}  # redis 或 simple（内存缓存）
+    redis:
+      time-to-live: 86400000  # 默认24小时（毫秒）
+      key-prefix: "rag:cache:"  # 缓存键前缀
+      use-key-prefix: true
+      cache-null-values: false  # 不缓存null值
+
+    # 数据库配置
   datasource:
-    url: jdbc:postgresql://localhost:15432/rag_system
-    username: postgres
-    password: postgres
-    driver-class-name: org.postgresql.Driver
-    hikari:
-      maximum-pool-size: 10
-      minimum-idle: 5
-      idle-timeout: 30000
-      connection-timeout: 30000
-      pool-name: RagHikariPool
+    postgres:
+      url: jdbc:postgresql://192.168.2.219:15432/rag_system
+      username: postgres
+      password: postgres
+      driver-class-name: org.postgresql.Driver
+      hikari:
+        maximum-pool-size: 10
+        minimum-idle: 5
+        idle-timeout: 30000
+        connection-timeout: 30000
+        pool-name: PostgresHikariPool
+    mysql:
+      url: jdbc:mysql://192.168.2.219:3307/agent?useSSL=false&serverTimezone=UTC&characterEncoding=UTF-8
+      username: root
+      password: root123
+      driver-class-name: com.mysql.cj.jdbc.Driver
+      hikari:
+        maximum-pool-size: 5
+        minimum-idle: 2
+        idle-timeout: 30000
+        max-lifetime: 1800000
+        connection-timeout: 30000
+        pool-name: MySqlHikariPool
   
   # Spring AI配置
   ai:
+    mcp:
+      client:
+        toolcallback:
+          enabled: true
     openai:
       api-key: ${OPENAI_API_KEY:sk-375014f0a89f4e3ebb9cc22ef791cd90}
       base-url: ${OPENAI_BASE_URL:https://dashscope.aliyuncs.com/compatible-mode}
@@ -31,26 +93,12 @@ spring:
     multipart:
       max-file-size: 10MB
 
-mybatis:
-  mapper-locations: classpath:/mybatis/mapper/*.xml
-  config-location: classpath:/mybatis/config/mybatis-config.xml
-  type-handlers-package: cn.cug.sxy.ai.infrastructure.dao.mybatis.typehandler
-
 # PageHelper分页插件配置
 pagehelper:
   helper-dialect: postgresql
   reasonable: true
   support-methods-arguments: true
   params: count=countSql
-
-# 服务器配置
-server:
-  port: 8091
-  tomcat:
-    threads:
-      max: 500        # 设定处理客户请求的线程的最大数目，决定了服务器可以同时响应客户请求的数,默认200
-      min-spare: 50   # 初始化线程数,最小空闲线程数,默认是10
-    accept-count: 10  # 等待队列长度
 
 # 日志
 logging:
@@ -62,7 +110,31 @@ logging:
 
 # RAG系统自定义配置
 rag:
+  intent:
+    confidence-threshold: 0.65
+    semantic:
+      threshold: 0.8
+    llm-planner-enabled: true
+    llm-planner-min-length: 10
+    default-processor: BASIC
+    enable-cache: true
+    enable-tracking: true
+    plan-cache:
+      similarity-threshold: 0.95
+      max-cache-size: 1000
+      ttl-hours: 24
+  fallback:
+    max-tool-retries: 2
+    max-task-retries: 1
+    enable-clarification: true
+  orchestration:
+    enable-parallel: true
   async:
+    task:
+      core-pool-size: 10
+      max-pool-size: 20
+      queue-capacity: 100
+      keep-alive-seconds: 60
     document:
       core-pool-size: 4
       max-pool-size: 16
@@ -73,6 +145,42 @@ rag:
       max-pool-size: 32
       queue-capacity: 500
       keep-alive-seconds: 120
+  # 嵌入向量配置
+  embedding:
+    batch-size: 10  # API批量大小限制（通义千问限制为10，其他API可能不同）
+  # L2解析层配置
+  parsing:
+    enable-hybrid-parser: true  # 启用混合解析器（智能路由）
+    force-ocr: false  # 强制使用OCR（用于测试）
+    confidence-threshold: 0.0  # 置信度阈值，低于此值的元素将被过滤（0.0表示不过滤）
+    parallel-pages: 4  # 并行处理的页面数
+    page-timeout-seconds: 60  # 单页处理超时时间（秒），大文档建议增加此值
+    max-total-timeout-seconds: 3600  # 最大总超时时间（秒），默认1小时，大文档可增加
+    enable-cache: true  # 启用解析结果缓存，支持失败页面重试
+    enable-dynamic-timeout: true  # 启用动态超时计算，根据网络状况自动调整
+    max-page-retries: 3  # 单页最大重试次数，失败页面会自动重试
+    timeout-multiplier: 3.0  # 超时时间倍数，用于计算总超时，值越大越宽松
+    enable-table-merge: true  # 是否启用跨页表格合并
+    # 是否启用表格检测（检测到表格时自动使用OCR）
+    enable-table-detection: true
+    pdf:
+      render-dpi: 300  # PDF渲染DPI（300为高质量）
+      image-format: PNG  # 图像格式
+    table-merge:
+      enabled: true  # 启用跨页表格合并
+      header-similarity-threshold: 0.7  # 表头相似度阈值
+      bottom-threshold-ratio: 0.85  # 页面底部阈值（相对于页面高度）
+      top-threshold-ratio: 0.15  # 页面顶部阈值（相对于页面高度）
+  cache:
+    cleanup-on-startup: true  # 启动时是否清理旧格式缓存（序列化器变更时需要设为true，建议首次部署时启用）
+
+  # OCR配置
+  ocr:
+    ali:
+      enabled: true  # 启用阿里云DashScope OCR
+      api-key: ${DASHSCOPE_API_KEY:sk-375014f0a89f4e3ebb9cc22ef791cd90}  # 阿里云DashScope API Key（从环境变量读取）
+      model: qwen3-vl-plus  # 使用的视觉模型
+
   # 文档分块配置
   chunking:
     default-chunk-size: 500
@@ -97,6 +205,7 @@ rag:
     semantic:
       threshold: 0.75
       min-difference: 0.1
+      precompute-on-startup: false  # 启动时是否预计算语义路由向量（false可减少启动时token消耗）
   
   # 查询转换配置
   query-transformation:
@@ -128,7 +237,7 @@ rag:
   vector-store:
     # PGVector配置
     pgvector:
-      table-name: t_document_chunk
+      table-name: document_chunk
       vector-column: vector
       content-column: content
       metadata-column: metadata

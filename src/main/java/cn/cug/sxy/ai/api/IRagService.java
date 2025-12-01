@@ -3,7 +3,7 @@ package cn.cug.sxy.ai.api;
 import cn.cug.sxy.ai.api.dto.QueryRequestDTO;
 import cn.cug.sxy.ai.api.vo.DocumentDetailVO;
 import cn.cug.sxy.ai.api.vo.ResponseVO;
-import org.springframework.http.ResponseEntity;
+import cn.cug.sxy.ai.api.response.ApiResponse;
 import org.springframework.web.multipart.MultipartFile;
 
 /**
@@ -22,7 +22,7 @@ public interface IRagService {
      * @param metadata 文档元数据
      * @return 文档详情VO
      */
-    ResponseEntity<DocumentDetailVO> uploadDocument(MultipartFile file, String metadata);
+    ApiResponse<DocumentDetailVO> uploadDocument(MultipartFile file, String metadata);
 
     /**
      * 查询文档
@@ -30,6 +30,6 @@ public interface IRagService {
      * @param requestDTO 查询请求DTO
      * @return 查询结果
      */
-    ResponseEntity<ResponseVO> queryDocument(QueryRequestDTO requestDTO);
+    ApiResponse<ResponseVO> queryDocument(QueryRequestDTO requestDTO);
 
 }

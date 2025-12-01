@@ -1,0 +1,20 @@
+{
+  "mcpServers": {
+    "filesystem": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "@modelcontextprotocol/server-filesystem",
+        "/Users/jerryhotton/Desktop",
+        "/Users/jerryhotton/Desktop"
+      ]
+    },
+    "web-search": {
+      "name": "Web Search MCP",
+      "type": "streamableHttp",
+      "description": "Multi-engine web search with article fetching",
+      "isActive": true,
+      "baseUrl": "http://localhost:3000/mcp"
+    }
+  }
+}

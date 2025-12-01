@@ -4,6 +4,7 @@ import cn.cug.sxy.ai.domain.rag.model.entity.Query;
 import cn.cug.sxy.ai.domain.rag.service.query.IQueryProcessor;
 import cn.cug.sxy.ai.domain.rag.service.query.QueryType;
 import cn.cug.sxy.ai.infrastructure.embedding.IEmbeddingService;
+import jakarta.annotation.PostConstruct;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
@@ -39,6 +40,13 @@ public class SemanticQueryRouter implements IQueryRouter {
     @Value("${rag.routing.semantic.min-difference:0.1}")
     private double minSimilarityDifference;
 
+    // 是否在启动时预计算向量（设为false可减少启动时的token消耗）
+    @Value("${rag.routing.semantic.precompute-on-startup:false}")
+    private boolean precomputeOnStartup;
+
+    // 懒加载标记
+    private volatile boolean embeddingsInitialized = false;
+
     /**
      * 构造函数
      *
@@ -56,9 +64,36 @@ public class SemanticQueryRouter implements IQueryRouter {
         this.queryTypeExamples = initializeQueryTypeExamples();
         // 初始化嵌入向量缓存
         this.queryTypeEmbeddings = new EnumMap<>(QueryType.class);
-        // 预计算所有示例问题的嵌入向量
-        precomputeEmbeddings();
-        log.info("已注册{}个查询处理器, 已初始化语义路由模型", queryProcessors.size());
+        log.info("已注册{}个查询处理器, 语义路由预计算: {}", queryProcessors.size(), precomputeOnStartup);
+    }
+
+    /**
+     * 延迟初始化：在启动时不配置预计算时，首次使用时才计算向量
+     */
+    private void ensureEmbeddingsInitialized() {
+        if (!embeddingsInitialized) {
+            synchronized (this) {
+                if (!embeddingsInitialized) {
+                    log.info("首次使用语义路由，开始计算示例向量...");
+                    precomputeEmbeddings();
+                    embeddingsInitialized = true;
+                }
+            }
+        }
+    }
+
+    /**
+     * 启动时初始化（仅在配置启用预计算时执行）
+     */
+    @PostConstruct
+    public void init() {
+        if (precomputeOnStartup) {
+            log.info("启动时预计算语义路由向量...");
+            precomputeEmbeddings();
+            embeddingsInitialized = true;
+        } else {
+            log.info("语义路由向量将在首次使用时懒加载（可通过 rag.routing.semantic.precompute-on-startup=true 开启启动预计算）");
+        }
     }
 
     /**
@@ -69,6 +104,7 @@ public class SemanticQueryRouter implements IQueryRouter {
      */
     @Override
     public IQueryProcessor route(Query query) {
+        ensureEmbeddingsInitialized();
         QueryType targetType = determineQueryType(query);
         query.setQueryType(targetType.name());
         query.setRouteTarget(targetType.name());
@@ -79,6 +115,7 @@ public class SemanticQueryRouter implements IQueryRouter {
 
     @Override
     public IQueryProcessor route(Query query, Map<String, Object> params) {
+        ensureEmbeddingsInitialized();
         try {
             // 显式指定优先（queryType / forceType）
             if (params != null) {

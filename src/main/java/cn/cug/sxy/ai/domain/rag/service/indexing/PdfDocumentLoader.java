@@ -1,33 +1,32 @@
 package cn.cug.sxy.ai.domain.rag.service.indexing;
 
-import org.apache.pdfbox.Loader;
-import org.apache.pdfbox.io.RandomAccessReadBuffer;
-import org.apache.pdfbox.pdmodel.PDDocument;
-import org.apache.pdfbox.pdmodel.PDDocumentInformation;
-import org.apache.pdfbox.text.PDFTextStripper;
+import cn.cug.sxy.ai.domain.rag.service.parsing.HybridDocumentParser;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
-import java.io.File;
 import java.io.IOException;
-import java.io.InputStream;
-import java.net.URL;
-import java.net.URLConnection;
-import java.util.Calendar;
 import java.util.HashMap;
 import java.util.Map;
 
 /**
- * @version 1.0
+ * PDF文档加载器实现（增强版）。
+ * 集成Hybrid Parser，支持智能路由：直接文本提取 → OCR降级。
+ * 
+ * @version 2.0
  * @Date 2025/9/8 15:20
- * @Description PDF文档加载器实现
+ * @Description PDF文档加载器实现（支持OCR）
  * @Author jerryhotton
  */
-
+@Slf4j
 @Component
+@RequiredArgsConstructor
 public class PdfDocumentLoader implements IDocumentLoader {
+    
+    private final HybridDocumentParser hybridParser;
 
     /**
-     * 从本地文件路径加载PDF文档
+     * 从本地文件路径加载PDF文档（使用Hybrid Parser）。
      *
      * @param filePath 文件路径
      * @return 文档内容和元数据的Map，包含text和metadata两个键
@@ -35,14 +34,41 @@ public class PdfDocumentLoader implements IDocumentLoader {
      */
     @Override
     public Map<String, Object> loadFromFile(String filePath) throws IOException {
-        File file = new File(filePath);
-        try (PDDocument document = Loader.loadPDF(file)) {
-            return extractContentAndMetadata(document, filePath);
+        try {
+            log.debug("使用Hybrid Parser解析PDF文件: {}", filePath);
+            
+            // 使用Hybrid Parser解析
+            HybridDocumentParser.ParsingResult result = hybridParser.parseFromFile(filePath, "pdf");
+            
+            // 构建返回结果
+            Map<String, Object> loadResult = new HashMap<>();
+            loadResult.put("text", result.getFinalText());
+            loadResult.put("metadata", result.getMetadata() != null ? result.getMetadata() : new HashMap<>());
+            
+            // 添加解析方法信息
+            if (result.getMetadata() == null) {
+                result.setMetadata(new HashMap<>());
+            }
+            result.getMetadata().put("parsingMethod", result.getParsingMethod());
+            result.getMetadata().put("qualityScore", result.getQualityScore());
+            
+            // 如果有结构化文档，也保存
+            if (result.getStructuredDocument() != null) {
+                loadResult.put("structuredDocument", result.getStructuredDocument());
+            }
+            
+            log.info("PDF解析完成，方法: {}, 质量分数: {}", 
+                    result.getParsingMethod(), result.getQualityScore());
+            
+            return loadResult;
+        } catch (Exception e) {
+            log.error("PDF解析失败，文件: {}", filePath, e);
+            throw new IOException("PDF解析失败: " + e.getMessage(), e);
         }
     }
 
     /**
-     * 从URL加载PDF文档
+     * 从URL加载PDF文档（使用Hybrid Parser）。
      *
      * @param url 文档URL
      * @return 文档内容和元数据的Map，包含text和metadata两个键
@@ -50,64 +76,30 @@ public class PdfDocumentLoader implements IDocumentLoader {
      */
     @Override
     public Map<String, Object> loadFromUrl(String url) throws IOException {
-        URLConnection connection = new URL(url).openConnection();
-        connection.setRequestProperty("User-Agent", "Mozilla/5.0");
-        try (InputStream is = connection.getInputStream()) {
-            RandomAccessReadBuffer buffer = new RandomAccessReadBuffer(is);
-            try (PDDocument document = Loader.loadPDF(buffer)) {
-                return extractContentAndMetadata(document, url);
+        try {
+            log.debug("使用Hybrid Parser解析PDF URL: {}", url);
+            
+            HybridDocumentParser.ParsingResult result = hybridParser.parseFromUrl(url, "pdf");
+            
+            Map<String, Object> loadResult = new HashMap<>();
+            loadResult.put("text", result.getFinalText());
+            loadResult.put("metadata", result.getMetadata() != null ? result.getMetadata() : new HashMap<>());
+            
+            if (result.getMetadata() == null) {
+                result.setMetadata(new HashMap<>());
             }
-        }
-    }
-
-    /**
-     * 从PDDocument对象中提取内容和元数据
-     *
-     * @param document PDFBox文档对象
-     * @param source 文档来源（文件路径或URL）
-     * @return 包含文本内容和元数据的Map
-     * @throws IOException 如果文本提取失败
-     */
-    private Map<String, Object> extractContentAndMetadata(PDDocument document, String source) throws IOException {
-        Map<String, Object> result = new HashMap<>();
-        // 提取文本内容
-        PDFTextStripper textStripper = new PDFTextStripper();
-        textStripper.setSortByPosition(true);
-        String text = textStripper.getText(document);
-        result.put("text", text);
-        // 提取元数据
-        Map<String, Object> metadata = new HashMap<>();
-        PDDocumentInformation info = document.getDocumentInformation();
-        metadata.put("title", info.getTitle());
-        metadata.put("author", info.getAuthor());
-        metadata.put("subject", info.getSubject());
-        metadata.put("keywords", info.getKeywords());
-        metadata.put("creator", info.getCreator());
-        metadata.put("producer", info.getProducer());
-        Calendar creationDate = info.getCreationDate();
-        if (creationDate != null) {
-            metadata.put("creationDate", creationDate.getTime());
-        }
-        Calendar modificationDate = info.getModificationDate();
-        if (modificationDate != null) {
-            metadata.put("modificationDate", modificationDate.getTime());
-        }
-        // 文档属性
-        metadata.put("pageCount", document.getNumberOfPages());
-        metadata.put("isEncrypted", document.isEncrypted());
-        metadata.put("version", document.getVersion());
-        // 如果有来源信息，添加到元数据
-        if (source != null) {
-            String fileName = source;
-            if (source.contains("/")) {
-                fileName = source.substring(source.lastIndexOf('/') + 1);
+            result.getMetadata().put("parsingMethod", result.getParsingMethod());
+            result.getMetadata().put("qualityScore", result.getQualityScore());
+            
+            if (result.getStructuredDocument() != null) {
+                loadResult.put("structuredDocument", result.getStructuredDocument());
             }
-            metadata.put("source", source);
-            metadata.put("fileName", fileName);
+            
+            return loadResult;
+        } catch (Exception e) {
+            log.error("PDF解析失败，URL: {}", url, e);
+            throw new IOException("PDF解析失败: " + e.getMessage(), e);
         }
-
-        result.put("metadata", metadata);
-        return result;
     }
 
     /**

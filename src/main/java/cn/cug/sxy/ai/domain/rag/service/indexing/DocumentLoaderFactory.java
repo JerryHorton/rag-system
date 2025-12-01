@@ -74,6 +74,17 @@ public class DocumentLoaderFactory {
             loaderMap.put("pptx", loader);
             loaderMap.put("ppt", loader);
             log.info("Registered PowerPointDocumentLoader for extensions: pptx, ppt");
+        } else if (loader instanceof ImageDocumentLoader) {
+            // 注册图片格式加载器（支持OCR识别）
+            loaderMap.put("png", loader);
+            loaderMap.put("jpg", loader);
+            loaderMap.put("jpeg", loader);
+            loaderMap.put("tiff", loader);
+            loaderMap.put("tif", loader);
+            loaderMap.put("bmp", loader);
+            loaderMap.put("webp", loader);
+            loaderMap.put("gif", loader);
+            log.info("Registered ImageDocumentLoader for extensions: png, jpg, jpeg, tiff, tif, bmp, webp, gif");
         } else {
             log.warn("Unknown DocumentLoader type: {}", loader.getClass().getName());
         }

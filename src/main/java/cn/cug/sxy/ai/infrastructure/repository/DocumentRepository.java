@@ -1,7 +1,7 @@
 package cn.cug.sxy.ai.infrastructure.repository;
 
 import cn.cug.sxy.ai.domain.rag.repository.IDocumentRepository;
-import cn.cug.sxy.ai.infrastructure.dao.IDocumentDao;
+import cn.cug.sxy.ai.infrastructure.dao.postgres.IDocumentDao;
 import cn.cug.sxy.ai.infrastructure.dao.converter.DocumentConverter;
 import cn.cug.sxy.ai.infrastructure.dao.po.DocumentPO;
 import cn.cug.sxy.ai.domain.rag.model.entity.Document;

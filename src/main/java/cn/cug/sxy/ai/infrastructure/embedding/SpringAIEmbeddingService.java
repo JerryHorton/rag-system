@@ -33,6 +33,10 @@ public class SpringAIEmbeddingService implements IEmbeddingService {
     @Resource
     @Lazy
     private SpringAIEmbeddingService self;
+    
+    // API批量大小限制（根据API文档，通义千问限制为10）
+    @org.springframework.beans.factory.annotation.Value("${rag.embedding.batch-size:10}")
+    private int apiBatchSize;
 
     public SpringAIEmbeddingService(
             EmbeddingModel embeddingModel,
@@ -95,31 +99,60 @@ public class SpringAIEmbeddingService implements IEmbeddingService {
         }
         // 批量处理未缓存的文本
         if (!uncachedTexts.isEmpty()) {
-            try {
-                // 一次性批量生成未命中项
-                List<float[]> newEmbeddings = embeddingModel.embed(uncachedTexts);
-                if (newEmbeddings.size() != uncachedTexts.size()) {
-                    throw new IllegalStateException("返回的嵌入数量与请求不一致: "
-                            + newEmbeddings.size() + " != " + uncachedTexts.size());
-                }
-                // 将新生成的向量放入结果列表的正确位置并写入缓存
-                for (int i = 0; i < newEmbeddings.size(); i++) {
-                    int originalIndex = uncachedIndices.get(i);
-                    float[] vec = newEmbeddings.get(i);
-                    resultArray[originalIndex] = vec;
-                    // 写入缓存
-                    cache.put(texts.get(originalIndex), vec);
-                }
-            } catch (Exception e) {
-                // 批量处理失败，降级为逐条（仍然写缓存）
-                log.warn("批量生成嵌入向量失败，尝试逐个生成", e);
-                for (int i = 0; i < uncachedTexts.size(); i++) {
-                    String text = uncachedTexts.get(i);
-                    int originalIndex = uncachedIndices.get(i);
-                    float[] vec = embeddingModel.embed(text);
-                    resultArray[originalIndex] = vec;
-                    // 写入缓存
-                    cache.put(texts.get(originalIndex), vec);
+            // 将大批次拆分成小批次（API限制批次大小）
+            List<float[]> allNewEmbeddings = new ArrayList<>();
+            int totalBatches = (uncachedTexts.size() + apiBatchSize - 1) / apiBatchSize;
+            
+            for (int batchIndex = 0; batchIndex < totalBatches; batchIndex++) {
+                int start = batchIndex * apiBatchSize;
+                int end = Math.min(start + apiBatchSize, uncachedTexts.size());
+                List<String> batchTexts = uncachedTexts.subList(start, end);
+                List<Integer> batchIndices = uncachedIndices.subList(start, end);
+                
+                try {
+                    log.debug("批量生成嵌入向量，批次 {}/{}, 数量: {}", 
+                            batchIndex + 1, totalBatches, batchTexts.size());
+                    
+                    // 调用API生成当前批次的向量
+                    List<float[]> batchEmbeddings = embeddingModel.embed(batchTexts);
+                    
+                    if (batchEmbeddings.size() != batchTexts.size()) {
+                        throw new IllegalStateException("返回的嵌入数量与请求不一致: "
+                                + batchEmbeddings.size() + " != " + batchTexts.size());
+                    }
+                    
+                    // 将批次结果添加到总结果中，并写入缓存和结果数组
+                    for (int i = 0; i < batchEmbeddings.size(); i++) {
+                        int originalIndex = batchIndices.get(i);
+                        float[] vec = batchEmbeddings.get(i);
+                        allNewEmbeddings.add(vec);
+                        resultArray[originalIndex] = vec;
+                        // 写入缓存
+                        cache.put(texts.get(originalIndex), vec);
+                    }
+                    
+                } catch (Exception e) {
+                    // 当前批次失败，降级为逐条生成
+                    log.warn("批次 {}/{} 批量生成失败，降级为逐个生成: {}", 
+                            batchIndex + 1, totalBatches, e.getMessage());
+                    
+                    for (int i = 0; i < batchTexts.size(); i++) {
+                        String text = batchTexts.get(i);
+                        int originalIndex = batchIndices.get(i);
+                        try {
+                            float[] vec = embeddingModel.embed(text);
+                            allNewEmbeddings.add(vec);
+                            resultArray[originalIndex] = vec;
+                            // 写入缓存
+                            cache.put(texts.get(originalIndex), vec);
+                        } catch (Exception ex) {
+                            log.error("单个文本向量生成失败: text={}", 
+                                    text.substring(0, Math.min(50, text.length())), ex);
+                            // 添加null占位，保持索引对应
+                            allNewEmbeddings.add(null);
+                            // resultArray保持为null，表示该位置生成失败
+                        }
+                    }
                 }
             }
         }
